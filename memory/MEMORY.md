@@ -1,0 +1,2 @@
+- [DocScan Finance CR proyecto](project_docscan_finance.md) — Plan v2.1, stack inviolable, reglas IA/OCR/Excel, machote, Fase 1 completada, Fase 2 pendiente.
+- [OneDrive + npm lock](feedback_onedrive_npm_lock.md) — Paquetes grandes (n8n) fallan en OneDrive con ECOMPROMISED; instalar fuera (C:\runtime).

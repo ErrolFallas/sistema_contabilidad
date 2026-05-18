@@ -3,6 +3,8 @@ import ProtectedRoute from './auth/ProtectedRoute.jsx';
 import AppLayout from './layouts/AppLayout.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
+import DocumentsPage from './pages/DocumentsPage.jsx';
+import DocumentDetailPage from './pages/DocumentDetailPage.jsx';
 import Placeholder from './pages/Placeholder.jsx';
 
 export default function App() {
@@ -18,7 +20,8 @@ export default function App() {
         }
       >
         <Route index element={<DashboardPage />} />
-        <Route path="documents" element={<Placeholder title="Gestion documental" description="Carga manual, filtros Drive/Gmail, vista por documento." />} />
+        <Route path="documents" element={<DocumentsPage />} />
+        <Route path="documents/:id" element={<DocumentDetailPage />} />
         <Route path="rag" element={<Placeholder title="Consulta RAG" description="Busqueda semantica sobre OCR y XML." />} />
         <Route path="chatbot" element={<Placeholder title="Chatbot contable" description="Asistente conversacional NLP -> SQL parametrizado." />} />
         <Route path="traceability" element={<Placeholder title="Trazabilidad" description="Timeline por documento (OCR -> IA -> BD -> Excel)." />} />

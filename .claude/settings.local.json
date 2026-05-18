@@ -14,7 +14,27 @@
       "Bash(cp \"C:/Users/Inspiron 15 3000/OneDrive/Escritorio/proyecto_contabilidad/backend/templates/Reintegro.xlsx\" inspect.xlsx)",
       "Bash(unzip -o inspect.xlsx -d xl_inspect)",
       "Bash(npm install *)",
-      "Bash(npx vite *)"
+      "Bash(npx vite *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5678)",
+      "Bash(node -e ' *)",
+      "Bash(npm run *)",
+      "Bash(mkdir -p /c/npm-cache /c/n8n-runtime)",
+      "Read(//c//**)",
+      "Bash(npm config *)",
+      "Bash(N8N_RUNNERS_ENABLED=true npx --yes n8n start)",
+      "Bash(curl -s http://localhost:3000/api/health)",
+      "Read(//tmp/**)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5173)",
+      "Bash(curl *)",
+      "Bash(npm init *)",
+      "Bash(python3 -m json.tool)",
+      "Bash(node src/scripts/test-gemini.js)",
+      "Bash(node -e \"const {config}=require\\('./src/config/env'\\); console.log\\('clientId len:', config.google.clientId.length, 'first15:', config.google.clientId.substring\\(0,15\\)\\); console.log\\('secret len:', config.google.clientSecret.length\\);\")",
+      "Bash(netstat -ano)",
+      "Bash(taskkill //F //PID 22504)",
+      "Bash(awk '{print $5}')",
+      "Bash(taskkill //F //PID 10092)",
+      "Bash(node -e \"require\\('./src/services/excelService'\\); console.log\\('OK'\\)\")"
     ]
   }
 }
