@@ -14,6 +14,7 @@ const { runOcrForDocument, classifyKind } = require('./ocrService');
 const { extractInvoiceFromOcr } = require('./geminiService');
 const { appendToReintegro } = require('./excelService');
 const { traceInstant, withStage } = require('./traceService');
+const currencyService = require('./currencyService');
 
 const NUMERIC_INVOICE_FIELDS = ['subtotal', 'descuento', 'impuesto_total', 'total'];
 const NUMERIC_LINE_FIELDS = [
@@ -205,38 +206,79 @@ async function processFile(input) {
 
     await pool.query(`UPDATE documents SET status = 'PERSISTED' WHERE id = ?`, [documentId]);
 
-    // 7. Excel REINTEGRO
-    let excelOut = null;
-    await withStage(documentId, 'EXCEL_START', async () => {
-      const [invoiceRow] = await pool.query(`SELECT * FROM invoices WHERE id = ?`, [invoiceId]);
-      const [lineRows] = await pool.query(`SELECT * FROM invoice_lines WHERE invoice_id = ?`, [invoiceId]);
-      const linesForExcel = lineRows.map((l) => ({
-        ...l,
-        base_gravable: l.base_gravable !== null ? Number(l.base_gravable) : null,
-        monto_iva: l.monto_iva !== null ? Number(l.monto_iva) : null,
-        porcentaje_iva: l.porcentaje_iva !== null ? Number(l.porcentaje_iva) : null,
-      }));
-      const invForExcel = {
-        ...invoiceRow[0],
-        total: invoiceRow[0].total !== null ? Number(invoiceRow[0].total) : null,
-        subtotal: invoiceRow[0].subtotal !== null ? Number(invoiceRow[0].subtotal) : null,
-        impuesto_total: invoiceRow[0].impuesto_total !== null ? Number(invoiceRow[0].impuesto_total) : null,
-        fecha_emision: invoiceRow[0].fecha_emision
-          ? new Date(invoiceRow[0].fecha_emision).toISOString().slice(0, 10)
-          : null,
-      };
-      excelOut = await appendToReintegro({ documentId, invoiceId, invoice: invForExcel, lines: linesForExcel });
+    // 6.5 Conversion monetaria (seccion 9 del plan v2.1)
+    //    - CRC: no convertir.
+    //    - USD/EUR: aplicar tipo de cambio VENTA de la fecha de emision (o del
+    //      dia disponible mas reciente hacia atras). NUNCA recalcular historicos:
+    //      lo que se persista aqui queda inmutable como snapshot.
+    await withStage(documentId, 'VALIDATION_DONE', async () => {
+      const [[inv0]] = await pool.query(
+        `SELECT moneda, total, fecha_emision FROM invoices WHERE id = ?`,
+        [invoiceId]
+      );
+      const moneda = inv0?.moneda;
+      const total = inv0?.total !== null ? Number(inv0.total) : null;
+      if (!moneda || moneda === 'CRC') return;
+      if (total === null) return;
+      const refDate = inv0.fecha_emision
+        ? new Date(inv0.fecha_emision).toISOString().slice(0, 10)
+        : new Date().toISOString().slice(0, 10);
+      const rate = await currencyService.ensureRate(refDate, moneda, 'VENTA');
+      if (!rate) return; // sin tipo de cambio disponible; queda null
+      const totalColones = Math.round(total * rate.valor * 100) / 100;
+      await pool.query(
+        `UPDATE invoices
+            SET tipo_cambio = ?, tipo_cambio_fecha = ?, total_colones = ?
+          WHERE id = ?`,
+        [rate.valor, rate.fecha, totalColones, invoiceId]
+      );
     });
-    await traceInstant(documentId, 'EXCEL_DONE', 'OK', `row=${excelOut.row_num}`);
+
+    // 7. Excel REINTEGRO (saltar si no hay datos extraibles)
+    const [invoiceRow] = await pool.query(`SELECT * FROM invoices WHERE id = ?`, [invoiceId]);
+    const invSnapshot = invoiceRow[0];
+    const minimumExtracted =
+      invSnapshot.proveedor_nombre || invSnapshot.numero_factura || invSnapshot.total !== null;
+
+    let excelOut = null;
+    let finalStatus = 'COMPLETED';
+
+    if (!minimumExtracted) {
+      // El documento no aporta datos de factura (puede ser un reporte/consolidado).
+      // No se escribe Excel: respetar el plan ("Excel es reporte, MySQL es fuente").
+      await traceInstant(documentId, 'EXCEL_START', 'SKIPPED', 'Sin datos extraibles; documento marcado para revision.');
+      finalStatus = 'REVIEW';
+    } else {
+      await withStage(documentId, 'EXCEL_START', async () => {
+        const [lineRows] = await pool.query(`SELECT * FROM invoice_lines WHERE invoice_id = ?`, [invoiceId]);
+        const linesForExcel = lineRows.map((l) => ({
+          ...l,
+          base_gravable: l.base_gravable !== null ? Number(l.base_gravable) : null,
+          monto_iva: l.monto_iva !== null ? Number(l.monto_iva) : null,
+          porcentaje_iva: l.porcentaje_iva !== null ? Number(l.porcentaje_iva) : null,
+        }));
+        const invForExcel = {
+          ...invSnapshot,
+          total: invSnapshot.total !== null ? Number(invSnapshot.total) : null,
+          subtotal: invSnapshot.subtotal !== null ? Number(invSnapshot.subtotal) : null,
+          impuesto_total: invSnapshot.impuesto_total !== null ? Number(invSnapshot.impuesto_total) : null,
+          fecha_emision: invSnapshot.fecha_emision
+            ? new Date(invSnapshot.fecha_emision).toISOString().slice(0, 10)
+            : null,
+        };
+        excelOut = await appendToReintegro({ documentId, invoiceId, invoice: invForExcel, lines: linesForExcel });
+      });
+      await traceInstant(documentId, 'EXCEL_DONE', 'OK', `row=${excelOut.row_num}`);
+    }
 
     await pool.query(
-      `UPDATE documents SET status = 'COMPLETED', completed_at = NOW() WHERE id = ?`,
-      [documentId]
+      `UPDATE documents SET status = ?, completed_at = NOW() WHERE id = ?`,
+      [finalStatus, documentId]
     );
 
     return {
       document_id: documentId,
-      status: 'COMPLETED',
+      status: finalStatus,
       invoice_id: invoiceId,
       lines_count: linesCount,
       duplicate_of: null,

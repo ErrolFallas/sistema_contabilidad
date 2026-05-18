@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import api from '../services/api.js';
+import { useAuth } from '../auth/AuthContext.jsx';
 
 const STATUS_COLORS = {
   COMPLETED: 'bg-green-100 text-green-800',
@@ -20,6 +21,8 @@ function StatusBadge({ status }) {
 
 export default function DocumentsPage() {
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
   const fileInputRef = useRef(null);
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -47,6 +50,68 @@ export default function DocumentsPage() {
     onError: (err) => { setUploadError(err?.response?.data?.message || err.message); },
     onSettled: () => setUploading(false),
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => api.delete(`/api/documents/${id}`).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', 'list'] }),
+    onError: (err) => alert(err?.response?.data?.message || err.message),
+  });
+
+  const resetMutation = useMutation({
+    mutationFn: () => api.delete('/api/documents/reintegro/reset').then((r) => r.data),
+    onSuccess: () => alert('Reintegro reiniciado. El proximo upload empieza en fila 14.'),
+    onError: (err) => alert(err?.response?.data?.message || err.message),
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: () => api.delete('/api/documents', {
+      headers: { 'X-Confirm-Bulk-Delete': 'ELIMINAR' },
+    }).then((r) => r.data),
+    onSuccess: (data) => {
+      alert(
+        `Eliminados ${data.documents_deleted} documentos.\n` +
+        `Archivos fisicos removidos: ${data.physical_files_removed}.\n` +
+        `Reintegro reiniciado: ${data.reintegro_reset.xlsx ? 'si' : 'no'}.`
+      );
+      qc.invalidateQueries({ queryKey: ['documents', 'list'] });
+    },
+    onError: (err) => alert(err?.response?.data?.message || err.message),
+  });
+
+  function handleDelete(d) {
+    if (!confirm(`Eliminar documento #${d.id} "${d.original_filename}"?\n\nEsto borra el archivo fisico y todos sus registros (factura, OCR, trazabilidad). Las celdas ya escritas en el Excel permanecen hasta que reinicies el Reintegro.`)) return;
+    deleteMutation.mutate(d.id);
+  }
+
+  function handleResetReintegro() {
+    if (!confirm('Reiniciar Reintegro?\n\nBorra el archivo Reintegro.xlsx actual. El proximo upload empezara en fila 14. La auditoria en base de datos se preserva.')) return;
+    resetMutation.mutate();
+  }
+
+  function handleBulkDelete() {
+    const total = data?.total || 0;
+    if (total === 0) {
+      alert('No hay documentos para eliminar.');
+      return;
+    }
+    // Primera barrera: confirm grande con consecuencias.
+    const ok1 = confirm(
+      `ATENCION: vas a borrar ${total} documento(s) y todo su historial:\n\n` +
+      `- Documentos, facturas, lineas, OCR completo.\n` +
+      `- Trazabilidad, mapeo Excel, extracciones IA.\n` +
+      `- Archivos fisicos en storage/uploads.\n` +
+      `- El Reintegro_actualizado.xlsx (se reinicia).\n\n` +
+      `Esta accion NO se puede deshacer.\n\nContinuar?`
+    );
+    if (!ok1) return;
+    // Segunda barrera: el usuario debe escribir ELIMINAR exactamente.
+    const typed = prompt('Para confirmar definitivamente, escriba la palabra ELIMINAR en mayusculas:');
+    if (typed !== 'ELIMINAR') {
+      alert('Confirmacion incorrecta. Operacion cancelada.');
+      return;
+    }
+    bulkDeleteMutation.mutate();
+  }
 
   function handleFiles(files) {
     if (!files || !files.length) return;
@@ -83,12 +148,33 @@ export default function DocumentsPage() {
     <div className="p-6">
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-xl font-semibold text-slate-800">Gestion documental</h1>
-        <button
-          onClick={downloadExcel}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded text-sm"
-        >
-          Descargar Reintegro.xlsx
-        </button>
+        <div className="flex gap-2">
+          {isAdmin && (
+            <>
+              <button
+                onClick={handleBulkDelete}
+                disabled={bulkDeleteMutation.isPending}
+                className="bg-red-700 hover:bg-red-800 text-white px-3 py-1.5 rounded text-sm disabled:opacity-60"
+                title="Borra TODOS los documentos y reinicia el Reintegro"
+              >
+                {bulkDeleteMutation.isPending ? 'Eliminando...' : 'Eliminar todos'}
+              </button>
+              <button
+                onClick={handleResetReintegro}
+                disabled={resetMutation.isPending}
+                className="bg-amber-600 hover:bg-amber-700 text-white px-3 py-1.5 rounded text-sm disabled:opacity-60"
+              >
+                {resetMutation.isPending ? 'Reiniciando...' : 'Nuevo Reintegro'}
+              </button>
+            </>
+          )}
+          <button
+            onClick={downloadExcel}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded text-sm"
+          >
+            Descargar Reintegro.xlsx
+          </button>
+        </div>
       </div>
 
       <div
@@ -143,14 +229,15 @@ export default function DocumentsPage() {
         </div>
       )}
 
-      <div className="mt-6 bg-white rounded-lg shadow overflow-hidden">
+      <div className="mt-6 bg-white rounded-lg shadow">
         <div className="px-4 py-2 border-b text-sm font-medium text-slate-700">
           Documentos ({data?.total || 0})
         </div>
         {isLoading ? (
           <div className="p-6 text-slate-500 text-sm">Cargando...</div>
         ) : data?.items?.length ? (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[1100px]">
             <thead className="bg-slate-50 text-slate-600 text-xs uppercase">
               <tr>
                 <th className="text-left px-4 py-2">#</th>
@@ -162,6 +249,7 @@ export default function DocumentsPage() {
                 <th className="text-right px-4 py-2">Total</th>
                 <th className="text-left px-4 py-2">Estado</th>
                 <th className="text-left px-4 py-2">Recibido</th>
+                {isAdmin && <th className="px-4 py-2"></th>}
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -184,10 +272,23 @@ export default function DocumentsPage() {
                   <td className="px-4 py-2 text-xs text-slate-500">
                     {new Date(d.received_at).toLocaleString('es-CR')}
                   </td>
+                  {isAdmin && (
+                    <td className="px-4 py-2 text-right whitespace-nowrap">
+                      <button
+                        onClick={() => handleDelete(d)}
+                        disabled={deleteMutation.isPending}
+                        className="text-xs text-red-600 hover:text-red-800 disabled:opacity-50"
+                        title="Eliminar documento (libera hash para resubir)"
+                      >
+                        Eliminar
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
         ) : (
           <div className="p-6 text-slate-500 text-sm">Sin documentos aun. Suba uno arriba.</div>
         )}

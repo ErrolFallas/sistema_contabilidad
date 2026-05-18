@@ -1,5 +1,5 @@
 const express = require('express');
-const { authRequired, ingestTokenRequired } = require('../middleware/auth');
+const { authRequired, requireRole, ingestTokenRequired } = require('../middleware/auth');
 const { upload: multerUpload } = require('../middleware/upload');
 const documentsController = require('../controllers/documentsController');
 
@@ -31,5 +31,20 @@ router.get('/', authRequired, documentsController.list);
 router.get('/reintegro/download', authRequired, documentsController.downloadReintegro);
 router.get('/:id', authRequired, documentsController.detail);
 router.get('/:id/trace', authRequired, documentsController.trace);
+
+// === Gestion (ADMIN) ===
+// Doble cerradura para wipe total: header de confirmacion + role ADMIN.
+function confirmHeaderRequired(req, res, next) {
+  if (req.headers['x-confirm-bulk-delete'] !== 'ELIMINAR') {
+    return res.status(400).json({
+      error: 'BadRequest',
+      message: 'Falta header X-Confirm-Bulk-Delete: ELIMINAR',
+    });
+  }
+  next();
+}
+router.delete('/', authRequired, requireRole('ADMIN'), confirmHeaderRequired, documentsController.bulkRemove);
+router.delete('/reintegro/reset', authRequired, requireRole('ADMIN'), documentsController.resetReintegro);
+router.delete('/:id', authRequired, requireRole('ADMIN'), documentsController.remove);
 
 module.exports = router;

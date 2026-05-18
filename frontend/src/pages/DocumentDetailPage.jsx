@@ -65,6 +65,12 @@ export default function DocumentDetailPage() {
                 <Field label="Subtotal" value={inv.subtotal} />
                 <Field label="Impuesto" value={inv.impuesto_total} />
                 <Field label="Total" value={inv.total} />
+                {inv.tipo_cambio && (
+                  <>
+                    <Field label="Tipo cambio aplicado" value={Number(inv.tipo_cambio).toFixed(2)} />
+                    <Field label="Total en colones" value={inv.total_colones ? Number(inv.total_colones).toLocaleString('es-CR', { minimumFractionDigits: 2 }) : null} />
+                  </>
+                )}
                 <Field label="Descripcion" value={inv.descripcion} span2 />
                 <Field label="Estado extraccion" value={inv.estado_extraccion} />
               </div>

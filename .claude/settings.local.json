@@ -34,7 +34,13 @@
       "Bash(taskkill //F //PID 22504)",
       "Bash(awk '{print $5}')",
       "Bash(taskkill //F //PID 10092)",
-      "Bash(node -e \"require\\('./src/services/excelService'\\); console.log\\('OK'\\)\")"
+      "Bash(node -e \"require\\('./src/services/excelService'\\); console.log\\('OK'\\)\")",
+      "Bash(node -e \"require\\('./src/routes/documentsRoutes'\\); console.log\\('OK'\\)\")",
+      "Bash(node -e \"require\\('./src/app'\\).buildApp; console.log\\('OK'\\)\")",
+      "Bash(node -e \"require\\('./src/routes/authRoutes'\\); require\\('./src/services/googleOAuthService'\\); console.log\\('OK'\\)\")",
+      "Bash(node -e \"require\\('./src/controllers/integrationsController'\\); console.log\\('OK'\\)\")",
+      "Bash(python3 -c \"import sys,json; t=json.load\\(sys.stdin\\)['token']; print\\(t\\)\")",
+      "Bash(node -e \"require\\('./src/services/pipelineService'\\); console.log\\('OK'\\)\")"
     ]
   }
 }

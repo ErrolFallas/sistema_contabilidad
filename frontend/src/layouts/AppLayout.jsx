@@ -32,9 +32,20 @@ export default function AppLayout() {
             Trazabilidad
           </NavLink>
           {user?.role === 'ADMIN' && (
-            <NavLink to="/admin" className={({isActive}) => `${linkBase} ${isActive ? linkActive : linkInactive}`}>
-              Administracion
-            </NavLink>
+            <>
+              <div className="pt-3 mt-3 border-t border-slate-700">
+                <div className="px-4 text-[10px] uppercase tracking-wide text-slate-500 mb-1">Administracion</div>
+                <NavLink to="/admin/users/new" className={({isActive}) => `${linkBase} ${isActive ? linkActive : linkInactive}`}>
+                  Registrar usuario
+                </NavLink>
+                <NavLink to="/admin/users" end className={({isActive}) => `${linkBase} ${isActive ? linkActive : linkInactive}`}>
+                  Gestionar usuarios
+                </NavLink>
+                <NavLink to="/admin/google" className={({isActive}) => `${linkBase} ${isActive ? linkActive : linkInactive}`}>
+                  Conexion Google
+                </NavLink>
+              </div>
+            </>
           )}
         </nav>
         <div className="p-3 border-t border-slate-700 text-sm">
