@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --version)",
+      "Bash(docker --version)",
+      "Bash(mysql --version)",
+      "Read(//c/tmp/**)",
+      "Bash(cp \"c:/Users/Inspiron 15 3000/Downloads/Plan_Maestro_v2.1.docx\" plan.docx)",
+      "Bash(unzip -o plan.docx -d plan_extracted)",
+      "Read(//tmp/plan_extracted/**)",
+      "Bash(python3 -c ' *)",
+      "Bash(mkdir -p \"C:/Users/Inspiron 15 3000/OneDrive/Escritorio/proyecto_contabilidad/backend/templates\")",
+      "Bash(cp \"C:/Users/Inspiron 15 3000/Downloads/Copia de Machote Reintegro de Caja Chica.xlsx\" \"C:/Users/Inspiron 15 3000/OneDrive/Escritorio/proyecto_contabilidad/backend/templates/Reintegro.xlsx\")",
+      "Bash(cp \"C:/Users/Inspiron 15 3000/OneDrive/Escritorio/proyecto_contabilidad/backend/templates/Reintegro.xlsx\" inspect.xlsx)",
+      "Bash(unzip -o inspect.xlsx -d xl_inspect)",
+      "Bash(npm install *)",
+      "Bash(npx vite *)"
+    ]
+  }
+}
