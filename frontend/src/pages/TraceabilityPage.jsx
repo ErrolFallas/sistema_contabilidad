@@ -117,8 +117,8 @@ export default function TraceabilityPage() {
   }
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-baseline mb-4">
+    <div className="p-4 md:p-6">
+      <div className="flex flex-wrap justify-between items-baseline gap-2 mb-4">
         <h1 className="text-xl font-semibold text-slate-800">Trazabilidad</h1>
         <span className="text-xs text-slate-400">
           {isLoading ? 'Cargando...' : `${data?.total || 0} documento(s) - refresca cada 5s`}

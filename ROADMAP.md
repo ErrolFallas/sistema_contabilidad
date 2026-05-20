@@ -96,9 +96,10 @@ Lista viva de lo que falta y de mejoras conocidas. Marcar con `[x]` al completar
   - Busqueda por proveedor o numero factura.
   - Implementado: backend acepta `status`, `source` (multi via comma), `from`, `to`, `search` (LIKE sobre original_filename / proveedor_nombre / numero_factura). Frontend: barra con ChipMulti reusable + date pickers + search box. Refresca con react-query cada 5s usando queryKey dinamico segun filtros activos.
 
-- [ ] **(P2, S)** Vista responsive mobile
+- [x] **(P2, S)** Vista responsive mobile
   - Sidebar colapsable en mobile.
   - Tablas con scroll mas amigables.
+  - Implementado: breakpoint en `lg` (1024px). Bajo eso: top bar fija con hamburger + titulo de la app, sidebar como overlay con transform/translate-x animado, backdrop semitransparente clickeable para cerrar, body.overflow blockado mientras esta abierto, cierre automatico al cambiar de ruta (useEffect sobre location.pathname). NavLinks del usuario en footer del sidebar truncados para nombres largos. Padding de paginas pasa de `p-6` a `p-4 md:p-6`. Headers de paginas con `flex-wrap` para no apretar titulo + botones en moviles. Tablas existentes ya tenian overflow-auto + min-w; siguen scrollables horizontalmente con touch.
 
 - [x] **(P2, M)** Cambiar password propio
   - Modal en perfil o pagina dedicada.

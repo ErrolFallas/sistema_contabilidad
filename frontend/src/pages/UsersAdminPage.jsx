@@ -58,7 +58,7 @@ export default function UsersAdminPage() {
   const adminFull = adminCount >= adminLimit;
 
   return (
-    <div className="p-6">
+    <div className="p-4 md:p-6">
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-xl font-semibold text-slate-800">Gestionar usuarios</h1>
         <Link

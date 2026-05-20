@@ -53,7 +53,7 @@ export default function RegisterUserPage() {
   }
 
   return (
-    <div className="p-6 max-w-xl">
+    <div className="p-4 md:p-6 max-w-xl">
       <h1 className="text-xl font-semibold text-slate-800 mb-4">Registrar usuario</h1>
 
       <div className="bg-white rounded-lg shadow p-5 mb-4">

@@ -103,8 +103,8 @@ export default function DashboardPage() {
   const monthlyData = stats?.monthly_evolution || [];
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-baseline mb-4">
+    <div className="p-4 md:p-6">
+      <div className="flex flex-wrap justify-between items-baseline gap-2 mb-4">
         <h1 className="text-xl font-semibold text-slate-800">Dashboard</h1>
         <span className="text-xs text-slate-400">
           {isLoading ? 'Cargando...' : `Actualizado: ${new Date(stats?.generated_at || Date.now()).toLocaleTimeString('es-CR')}`}

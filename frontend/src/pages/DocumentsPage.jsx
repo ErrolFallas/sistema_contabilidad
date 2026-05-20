@@ -201,10 +201,10 @@ export default function DocumentsPage() {
   }
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-4">
+    <div className="p-4 md:p-6">
+      <div className="flex flex-wrap justify-between items-center gap-2 mb-4">
         <h1 className="text-xl font-semibold text-slate-800">Gestion documental</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {isAdmin && (
             <>
               <button

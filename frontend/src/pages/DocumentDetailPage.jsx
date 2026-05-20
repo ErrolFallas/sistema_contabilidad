@@ -273,11 +273,11 @@ export default function DocumentDetailPage() {
   const edits = editsData?.edits || [];
 
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex items-center gap-3">
+    <div className="p-4 md:p-6 space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
         <Link to="/documents" className="text-sm text-brand-700 hover:underline">&larr; Volver</Link>
         <h1 className="text-xl font-semibold text-slate-800">Documento #{d.id}</h1>
-        <span className="text-sm text-slate-500 flex-1">{d.original_filename}</span>
+        <span className="text-sm text-slate-500 flex-1 truncate min-w-0">{d.original_filename}</span>
         {isAdmin && (
           <button
             onClick={handleReprocess}
