@@ -55,7 +55,7 @@ async function pollDrive(req, res, next) {
         try {
           await driveService.moveFile(f.id, target);
         } catch (e) {
-          console.warn('[pollDrive] move fallo:', e.message);
+          req.log.warn({ drive_file_id: f.id, target, err: e.message }, 'drive move failed');
         }
         results.push({ file: name, status: out.status, document_id: out.document_id });
       } catch (e) {
@@ -109,7 +109,7 @@ async function pollGmail(req, res, next) {
           await gmailService.markAsRead(m.messageId);
           marked = true;
         } catch (e) {
-          console.warn('[pollGmail] markAsRead fallo:', e.message);
+          req.log.warn({ gmail_message_id: m.messageId, err: e.message }, 'gmail markAsRead failed');
         }
       }
       results.push({

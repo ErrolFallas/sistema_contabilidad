@@ -8,6 +8,11 @@ const authRoutes = require('./routes/authRoutes');
 const documentsRoutes = require('./routes/documentsRoutes');
 const usersRoutes = require('./routes/usersRoutes');
 const integrationsRoutes = require('./routes/integrationsRoutes');
+const dashboardRoutes = require('./routes/dashboardRoutes');
+const invoicesRoutes = require('./routes/invoicesRoutes');
+const invoiceLinesRoutes = require('./routes/invoiceLinesRoutes');
+const traceabilityRoutes = require('./routes/traceabilityRoutes');
+const { requestLogger } = require('./middleware/requestLogger');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
 
 function buildApp() {
@@ -17,6 +22,7 @@ function buildApp() {
   app.use(cors({ origin: true, credentials: true }));
   app.use(express.json({ limit: '25mb' }));
   app.use(express.urlencoded({ extended: true, limit: '25mb' }));
+  app.use(requestLogger);
 
   // Rate limit general (no aplica a /health para monitoreo)
   const limiter = rateLimit({
@@ -34,6 +40,10 @@ function buildApp() {
   app.use('/api/documents', documentsRoutes);
   app.use('/api/users', usersRoutes);
   app.use('/api/integrations', integrationsRoutes);
+  app.use('/api/dashboard', dashboardRoutes);
+  app.use('/api/invoices', invoicesRoutes);
+  app.use('/api/invoice-lines', invoiceLinesRoutes);
+  app.use('/api/traceability', traceabilityRoutes);
 
   app.use(notFound);
   app.use(errorHandler);

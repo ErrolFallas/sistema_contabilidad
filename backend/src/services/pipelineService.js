@@ -15,6 +15,7 @@ const { extractInvoiceFromOcr } = require('./geminiService');
 const { appendToReintegro } = require('./excelService');
 const { traceInstant, withStage } = require('./traceService');
 const currencyService = require('./currencyService');
+const validationService = require('./validationService');
 
 const NUMERIC_INVOICE_FIELDS = ['subtotal', 'descuento', 'impuesto_total', 'total'];
 const NUMERIC_LINE_FIELDS = [
@@ -145,11 +146,83 @@ async function processFile(input) {
     });
     await traceInstant(documentId, 'GEMINI_DONE', 'OK');
 
+    // 5.4 Clasificacion de tipo_documento.
+    //   Gemini decide si lo que recibio es FACTURA individual, REPORTE
+    //   consolidado (caja chica del mes, estado de cuenta, listado) u OTRO
+    //   (contrato, identificacion, OCR ilegible). Solo FACTURA continua al
+    //   pipeline de invoice + Excel. Lo demas se marca REVIEW con motivo
+    //   explicito en error_message para que el usuario vea por que no llego
+    //   al Excel sin tener que abrir trazabilidad. Si el campo viene ausente
+    //   (compatibilidad con prompts viejos) asumimos FACTURA.
+    const tipoDoc = ['FACTURA', 'REPORTE', 'OTRO'].includes(extracted?.tipo_documento)
+      ? extracted.tipo_documento
+      : 'FACTURA';
+    if (tipoDoc !== 'FACTURA') {
+      const motivo = (extracted?.clasificacion_motivo || `Documento clasificado por la IA como ${tipoDoc}.`).slice(0, 4000);
+      await pool.query(
+        `UPDATE documents
+            SET status = 'REVIEW',
+                error_message = ?,
+                completed_at = NOW()
+          WHERE id = ?`,
+        [`[${tipoDoc}] ${motivo}`, documentId]
+      );
+      await traceInstant(
+        documentId,
+        'VALIDATION_DONE',
+        'SKIPPED',
+        `tipo_documento=${tipoDoc}: ${motivo}`
+      );
+      return {
+        document_id: documentId,
+        status: 'REVIEW',
+        invoice_id: null,
+        lines_count: 0,
+        duplicate_of: null,
+        excel: null,
+        classification: { tipo: tipoDoc, motivo },
+      };
+    }
+
+    // 5.5 Dedup por numero_factura + proveedor.
+    //   Se aplica DESPUES de la extraccion IA: el dedup por SHA de archivo (paso 2)
+    //   solo bloquea binarios identicos. Aqui bloqueamos casos donde el contador
+    //   resubio el mismo comprobante con otra resolucion/escaneo (binario distinto,
+    //   misma factura). El registro original queda intacto; el nuevo se marca como
+    //   DUPLICATE y no llega al Excel. Si el documento original fue eliminado
+    //   desde la UI, la invoice tambien desaparecio (FK CASCADE), por lo que esta
+    //   verificacion no encuentra match y el archivo se procesa normalmente.
+    const invoicePayload = sanitizeInvoice(extracted);
+    const dupByInvoice = await findExistingInvoiceMatch(invoicePayload, documentId);
+    if (dupByInvoice) {
+      await pool.query(
+        `UPDATE documents
+            SET status = 'DUPLICATE',
+                duplicate_document_id = ?,
+                completed_at = NOW()
+          WHERE id = ?`,
+        [dupByInvoice.document_id, documentId]
+      );
+      await traceInstant(
+        documentId,
+        'HASH_CHECK',
+        'SKIPPED',
+        `Factura duplicada por numero=${invoicePayload.numero_factura} (doc original #${dupByInvoice.document_id}). No se inserta invoice ni se escribe Excel.`
+      );
+      return {
+        document_id: documentId,
+        status: 'DUPLICATE',
+        duplicate_of: dupByInvoice.document_id,
+        invoice_id: null,
+        lines_count: 0,
+        excel: null,
+      };
+    }
+
     // 6. Persistir invoice + lines
     let invoiceId = null;
     let linesCount = 0;
     await withStage(documentId, 'MYSQL_DONE', async () => {
-      const invoicePayload = sanitizeInvoice(extracted);
       const [r] = await pool.query(
         `INSERT INTO invoices
            (document_id, proveedor_nombre, proveedor_cedula, proveedor_tipo_cedula,
@@ -206,11 +279,20 @@ async function processFile(input) {
 
     await pool.query(`UPDATE documents SET status = 'PERSISTED' WHERE id = ?`, [documentId]);
 
-    // 6.5 Conversion monetaria (seccion 9 del plan v2.1)
-    //    - CRC: no convertir.
-    //    - USD/EUR: aplicar tipo de cambio VENTA de la fecha de emision (o del
-    //      dia disponible mas reciente hacia atras). NUNCA recalcular historicos:
-    //      lo que se persista aqui queda inmutable como snapshot.
+    // 6.5 Conversion monetaria + validaciones cruzadas (seccion 9 + 16 del plan v2.1)
+    //    Conversion:
+    //      - CRC: no convertir.
+    //      - USD/EUR: aplicar tipo de cambio VENTA de la fecha de emision (o del
+    //        dia disponible mas reciente hacia atras). NUNCA recalcular historicos:
+    //        lo que se persista aqui queda inmutable como snapshot.
+    //    Validaciones aritmeticas:
+    //      - subtotal - descuento + impuesto_total = total (tolerancia 1 CRC).
+    //      - SUM(line.total) = invoice.total.
+    //      - base * porcentaje/100 = monto_iva por linea.
+    //      Si hay discrepancias: invoice.estado_extraccion = 'REVISION' y se
+    //      persiste el reporte en ai_extractions (purpose=VALIDATION). NO se
+    //      modifica ningun valor extraido (solo se flagea).
+    let validationResult = null;
     await withStage(documentId, 'VALIDATION_DONE', async () => {
       const [[inv0]] = await pool.query(
         `SELECT moneda, total, fecha_emision FROM invoices WHERE id = ?`,
@@ -218,21 +300,47 @@ async function processFile(input) {
       );
       const moneda = inv0?.moneda;
       const total = inv0?.total !== null ? Number(inv0.total) : null;
-      if (!moneda || moneda === 'CRC') return;
-      if (total === null) return;
-      const refDate = inv0.fecha_emision
-        ? new Date(inv0.fecha_emision).toISOString().slice(0, 10)
-        : new Date().toISOString().slice(0, 10);
-      const rate = await currencyService.ensureRate(refDate, moneda, 'VENTA');
-      if (!rate) return; // sin tipo de cambio disponible; queda null
-      const totalColones = Math.round(total * rate.valor * 100) / 100;
-      await pool.query(
-        `UPDATE invoices
-            SET tipo_cambio = ?, tipo_cambio_fecha = ?, total_colones = ?
-          WHERE id = ?`,
-        [rate.valor, rate.fecha, totalColones, invoiceId]
-      );
+      if (moneda && moneda !== 'CRC' && total !== null) {
+        const refDate = inv0.fecha_emision
+          ? new Date(inv0.fecha_emision).toISOString().slice(0, 10)
+          : new Date().toISOString().slice(0, 10);
+        const rate = await currencyService.ensureRate(refDate, moneda, 'VENTA');
+        if (rate) {
+          const totalColones = Math.round(total * rate.valor * 100) / 100;
+          await pool.query(
+            `UPDATE invoices
+                SET tipo_cambio = ?, tipo_cambio_fecha = ?, total_colones = ?
+              WHERE id = ?`,
+            [rate.valor, rate.fecha, totalColones, invoiceId]
+          );
+        }
+      }
+
+      validationResult = await validationService.runArithmeticValidation({
+        invoiceId,
+        tolerance: validationService.DEFAULT_TOLERANCE_CRC,
+      });
+      await validationService.persistValidation({
+        documentId,
+        invoiceId,
+        result: validationResult,
+        tolerance: validationService.DEFAULT_TOLERANCE_CRC,
+      });
+      if (!validationResult.ok) {
+        await pool.query(
+          `UPDATE invoices SET estado_extraccion = 'REVISION' WHERE id = ?`,
+          [invoiceId]
+        );
+      }
     });
+    if (validationResult && !validationResult.ok) {
+      await traceInstant(
+        documentId,
+        'VALIDATION_DONE',
+        'OK',
+        `${validationResult.summary}. Primera: ${validationResult.issues[0].message}`
+      );
+    }
 
     // 7. Excel REINTEGRO (saltar si no hay datos extraibles)
     const [invoiceRow] = await pool.query(`SELECT * FROM invoices WHERE id = ?`, [invoiceId]);
@@ -321,6 +429,52 @@ function decideEstadoExtraccion(inv) {
   if (missing.length === 0) return 'OK';
   if (missing.length >= 3) return 'REVISION';
   return 'FALTANTE';
+}
+
+/**
+ * Busca si ya existe una invoice activa con el mismo numero_factura y proveedor.
+ * - Preferimos comparar por proveedor_cedula (estable).
+ * - Si no hay cedula, fallback por proveedor_nombre normalizado (UPPER + TRIM).
+ * - Excluye el documento actual y cualquier doc en estado DUPLICATE o ERROR.
+ * Devuelve { document_id, invoice_id } o null.
+ */
+async function findExistingInvoiceMatch(invoicePayload, currentDocumentId) {
+  if (!invoicePayload.numero_factura) return null;
+
+  if (invoicePayload.proveedor_cedula) {
+    const [rows] = await pool.query(
+      `SELECT i.id AS invoice_id, i.document_id
+         FROM invoices i
+         JOIN documents d ON d.id = i.document_id
+        WHERE i.numero_factura = ?
+          AND i.proveedor_cedula = ?
+          AND d.id <> ?
+          AND d.status NOT IN ('DUPLICATE','ERROR')
+        ORDER BY i.id ASC
+        LIMIT 1`,
+      [invoicePayload.numero_factura, invoicePayload.proveedor_cedula, currentDocumentId]
+    );
+    return rows[0] || null;
+  }
+
+  if (invoicePayload.proveedor_nombre) {
+    const normalized = invoicePayload.proveedor_nombre.trim().toUpperCase();
+    const [rows] = await pool.query(
+      `SELECT i.id AS invoice_id, i.document_id
+         FROM invoices i
+         JOIN documents d ON d.id = i.document_id
+        WHERE i.numero_factura = ?
+          AND UPPER(TRIM(i.proveedor_nombre)) = ?
+          AND d.id <> ?
+          AND d.status NOT IN ('DUPLICATE','ERROR')
+        ORDER BY i.id ASC
+        LIMIT 1`,
+      [invoicePayload.numero_factura, normalized, currentDocumentId]
+    );
+    return rows[0] || null;
+  }
+
+  return null;
 }
 
 function sanitizeLine(raw = {}) {

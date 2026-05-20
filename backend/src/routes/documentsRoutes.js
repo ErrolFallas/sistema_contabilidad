@@ -31,6 +31,7 @@ router.get('/', authRequired, documentsController.list);
 router.get('/reintegro/download', authRequired, documentsController.downloadReintegro);
 router.get('/:id', authRequired, documentsController.detail);
 router.get('/:id/trace', authRequired, documentsController.trace);
+router.get('/:id/edits', authRequired, require('../controllers/editsController').listEdits);
 
 // === Gestion (ADMIN) ===
 // Doble cerradura para wipe total: header de confirmacion + role ADMIN.

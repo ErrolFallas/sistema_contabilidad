@@ -87,7 +87,8 @@ function validateRequiredSecrets({ throwOnMissing = true } = {}) {
     `[config] Variables obligatorias ausentes en .env: ${missing.join(', ')}. ` +
     `Defina valores en backend/.env (ver backend/.env.example) y reinicie.`;
   if (throwOnMissing) throw new Error(msg);
-  console.error(msg);
+  const { logger } = require('../lib/logger');
+  logger.error({ missing }, 'required env secrets missing');
   return { ok: false, missing };
 }
 

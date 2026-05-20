@@ -4,13 +4,14 @@ const { pool } = require('../db/pool');
 const { processFile } = require('../services/pipelineService');
 const { traceList } = require('../services/traceService');
 const { processedExcelPath } = require('../services/storageService');
+const { logger } = require('../lib/logger');
 
 function safeUnlink(p) {
   try {
     if (p && fs.existsSync(p)) fs.unlinkSync(p);
     return true;
   } catch (e) {
-    console.warn('[safeUnlink]', p, e.message);
+    logger.warn({ path: p, err: e.message }, 'safeUnlink failed');
     return false;
   }
 }
@@ -94,12 +95,31 @@ async function detail(req, res, next) {
          FROM excel_mapping WHERE document_id = ? ORDER BY id ASC`,
       [id]
     );
+    const [validationRows] = await pool.query(
+      `SELECT id, response_raw, response_json, created_at
+         FROM ai_extractions
+        WHERE document_id = ? AND purpose = 'VALIDATION'
+        ORDER BY id DESC
+        LIMIT 1`,
+      [id]
+    );
+    let validation = null;
+    if (validationRows[0]) {
+      const raw = validationRows[0].response_json;
+      const parsed = typeof raw === 'string' ? (() => { try { return JSON.parse(raw); } catch { return null; } })() : raw;
+      validation = {
+        summary: validationRows[0].response_raw,
+        result: parsed,
+        created_at: validationRows[0].created_at,
+      };
+    }
     res.json({
       document: docs[0],
       ocr: ocr || null,
       invoices,
       lines,
       excel_mapping: excelMap,
+      validation,
     });
   } catch (e) {
     next(e);

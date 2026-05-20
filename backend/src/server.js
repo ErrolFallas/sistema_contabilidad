@@ -1,6 +1,7 @@
 const { buildApp } = require('./app');
 const { config, validateRequiredSecrets } = require('./config/env');
 const { ping } = require('./db/pool');
+const { logger } = require('./lib/logger');
 
 async function start() {
   validateRequiredSecrets();
@@ -8,19 +9,26 @@ async function start() {
 
   try {
     await ping();
-    console.log(`[mysql] Conectado a ${config.db.host}:${config.db.port}/${config.db.database} como ${config.db.user}`);
+    logger.info({
+      host: config.db.host,
+      port: config.db.port,
+      database: config.db.database,
+      user: config.db.user,
+    }, 'mysql connected');
   } catch (e) {
-    console.warn(`[mysql] ADVERTENCIA: no se pudo conectar (${e.code || e.message}). El servidor arranca igual; revisar /api/health.`);
+    logger.warn({ err: { code: e.code, message: e.message } }, 'mysql connection failed at startup; check /api/health');
   }
 
   app.listen(config.port, () => {
-    console.log(`[server] Backend escuchando en http://localhost:${config.port}`);
-    console.log(`[server] Health:    http://localhost:${config.port}/api/health`);
-    console.log(`[server] Entorno:   ${config.env}`);
+    logger.info({
+      port: config.port,
+      env: config.env,
+      health_url: `http://localhost:${config.port}/api/health`,
+    }, 'backend listening');
   });
 }
 
 start().catch((err) => {
-  console.error('[server] Fallo de arranque:', err);
+  logger.fatal({ err: { message: err.message, stack: err.stack } }, 'server failed to start');
   process.exit(1);
 });

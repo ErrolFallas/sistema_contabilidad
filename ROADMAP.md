@@ -36,6 +36,9 @@ Lista viva de lo que falta y de mejoras conocidas. Marcar con `[x]` al completar
 - [ ] **(P2, S)** Limpieza automatica de `storage/temp` y archivos antiguos en `storage/uploads`
   - Cron diario que borra archivos > 30 dias.
 
+- [x] **(P1, S)** Dedup por numero de factura + proveedor (post-extraccion)
+  - Antes solo se deduplicaba por SHA del binario. Si el contador re-escaneaba en mayor resolucion, el binario diferia y la misma factura entraba dos veces. Ahora despues de Gemini, si `numero_factura + proveedor_cedula` (o `proveedor_nombre` normalizado como fallback) ya existe en un documento NO eliminado y NO en ERROR/DUPLICATE, el nuevo se marca como DUPLICATE y NO se inserta invoice ni se escribe Excel. Si el documento original se elimina desde la UI, su invoice desaparece por CASCADE y el archivo puede volver a procesarse normalmente.
+
 ---
 
 ## 2. RAG y chatbot
@@ -63,23 +66,26 @@ Lista viva de lo que falta y de mejoras conocidas. Marcar con `[x]` al completar
 
 ## 3. Frontend - modulos pendientes
 
-- [ ] **(P1, M)** Dashboard real (actualmente solo cards a 0)
+- [x] **(P1, M)** Dashboard real (actualmente solo cards a 0)
   - Indicadores: procesadas, duplicadas, error, revision, pendientes (queries reales).
   - Grafico por tarifa IVA con recharts.
   - Grafico por proveedor.
   - Grafico evolucion mensual.
   - Refetch automatico cada 10-30 s.
+  - Endpoint: `GET /api/dashboard/stats`. Refresca cada 15 s.
 
-- [ ] **(P1, M)** Modulo "Trazabilidad" pagina dedicada (`/traceability`)
+- [x] **(P1, M)** Modulo "Trazabilidad" pagina dedicada (`/traceability`)
   - Vista global de todos los documentos con su estado.
   - Filtros por etapa actual, estado, fecha.
   - Timeline grande con detalle por etapa.
+  - Endpoint: `GET /api/traceability` con filtros (`status`, `source`, `current_stage`, `from`, `to`) + stats agregadas (by_status, by_current_stage, stage_durations). LEFT JOIN con derived table de ultimo trace por documento para evitar correlated subqueries. Pagina refresca cada 5s. La timeline por documento sigue viviendo en `DocumentDetailPage` (al click en "Ver").
 
-- [ ] **(P1, M)** Modulo "Edicion auditada" (modulo 5 del plan)
+- [x] **(P1, M)** Modulo "Edicion auditada" (modulo 5 del plan)
   - Solo ADMIN.
   - Editar campos de `invoices` y `invoice_lines`.
   - Toda modificacion va a `manual_edits` (tabla ya existe) sin sobreescribir original.
   - Mostrar historial de cambios.
+  - Endpoints: `PATCH /api/invoices/:id`, `PATCH /api/invoice-lines/:id`, `GET /api/documents/:id/edits`. Whitelist de campos editables. `original_value` se guarda como el valor que estaba en la fila inmediatamente antes (primera edicion = valor IA). Razon obligatoria. Cambios se aplican en transaccion con su audit-line. Excel NO se actualiza automaticamente; usar "Nuevo Reintegro" para regenerarlo si se desea reflejar la edicion alli.
 
 - [ ] **(P2, S)** Filtros avanzados en `Gestion documental`
   - Por source_type (Drive / Gmail / Manual).
@@ -116,10 +122,11 @@ Lista viva de lo que falta y de mejoras conocidas. Marcar con `[x]` al completar
 
 ## 5. Operacion y observabilidad
 
-- [ ] **(P1, S)** Logs estructurados
+- [x] **(P1, S)** Logs estructurados
   - Reemplazar `console.log` con un logger (pino o winston).
   - Niveles por env (development verbose, production warn+).
   - Correlacion request_id por request HTTP.
+  - Implementado con `pino` + `pino-pretty`. Middleware `requestLogger` agrega `req.log` con `req_id` (UUID) y emite log por request al cerrar response. Header `X-Request-Id` expuesto al cliente. Path `/api/health` silenciado. Secretos (Authorization, X-N8N-Token, JWT_SECRET, etc.) redactados via `redact.paths`. CLI scripts (migrate/seed/test-gemini) mantienen console por simplicidad.
 
 - [ ] **(P2, M)** Tests automatizados
   - Backend: vitest + supertest para endpoints clave.
@@ -218,16 +225,18 @@ Lista viva de lo que falta y de mejoras conocidas. Marcar con `[x]` al completar
 
 ## 10. Calidad de la extraccion IA
 
-- [ ] **(P1, M)** Mejorar prompt para detectar documentos no-factura
+- [x] **(P1, M)** Mejorar prompt para detectar documentos no-factura
   - Hoy: si recibe un consolidado (caja chica del mes) extrae todo null y queda en REVIEW. Correcto pero ruidoso.
   - Mejora: Gemini puede devolver `tipo_documento: "FACTURA" | "REPORTE" | "OTRO"` y el pipeline decide.
+  - Implementado: el prompt clasifica antes de extraer. El pipeline en `pipelineService.js` (paso 5.4) corta temprano si tipo != FACTURA, escribe motivo en `documents.error_message` con prefijo `[REPORTE]` o `[OTRO]`, marca status REVIEW y emite trace VALIDATION_DONE/SKIPPED. UI del detalle pinta el mensaje en ambar (no rojo) cuando status=REVIEW. Fallback a FACTURA si Gemini omite el campo (compatibilidad).
 
 - [ ] **(P2, M)** Comparar OCR de pdf-parse vs Tesseract con metrica de confianza
   - Si pdf-parse devuelve menos de X caracteres O ratio caracteres-alfanumericos baja, fallback a Tesseract.
 
-- [ ] **(P2, M)** Validaciones cruzadas
+- [x] **(P2, M)** Validaciones cruzadas
   - Verificar que `subtotal + impuesto_total = total` con tolerancia (1 colon).
   - Si no cuadra, marcar invoice en REVISION.
+  - Implementado en `backend/src/services/validationService.js`: 3 chequeos (subtotal-descuento+impuesto=total, SUM(lineas)=total, base*pct/100=monto_iva por linea). Se corre en el stage VALIDATION_DONE despues de la conversion monetaria. Persiste en `ai_extractions` con purpose=VALIDATION. Marca `invoices.estado_extraccion='REVISION'` si hay discrepancias. La IA NUNCA corrige los valores - solo flagea. Detail endpoint expone el reporte; UI muestra una card "Validaciones cruzadas" (verde si OK, ambar con lista de issues si no).
 
 ---
 

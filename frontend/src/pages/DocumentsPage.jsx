@@ -230,54 +230,63 @@ export default function DocumentsPage() {
       )}
 
       <div className="mt-6 bg-white rounded-lg shadow">
-        <div className="px-4 py-2 border-b text-sm font-medium text-slate-700">
-          Documentos ({data?.total || 0})
+        <div className="px-4 py-2 border-b flex justify-between items-center">
+          <span className="text-sm font-medium text-slate-700">
+            Documentos ({data?.total || 0})
+          </span>
+          <span className="text-xs text-slate-400">
+            Mas recientes primero. El boton "Eliminar" queda fijo a la derecha.
+          </span>
         </div>
         {isLoading ? (
           <div className="p-6 text-slate-500 text-sm">Cargando...</div>
         ) : data?.items?.length ? (
-          <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[1100px]">
-            <thead className="bg-slate-50 text-slate-600 text-xs uppercase">
+          <div className="overflow-auto max-h-[calc(100vh-22rem)] rounded-b-lg">
+          <table className="w-full text-sm min-w-[1100px] border-separate border-spacing-0">
+            <thead className="text-slate-600 text-xs uppercase">
               <tr>
-                <th className="text-left px-4 py-2">#</th>
-                <th className="text-left px-4 py-2">Archivo</th>
-                <th className="text-left px-4 py-2">Origen</th>
-                <th className="text-left px-4 py-2">Tipo</th>
-                <th className="text-left px-4 py-2">Proveedor</th>
-                <th className="text-left px-4 py-2">Factura</th>
-                <th className="text-right px-4 py-2">Total</th>
-                <th className="text-left px-4 py-2">Estado</th>
-                <th className="text-left px-4 py-2">Recibido</th>
-                {isAdmin && <th className="px-4 py-2"></th>}
+                <th className="sticky top-0 z-10 bg-slate-50 border-b text-left px-4 py-2">#</th>
+                <th className="sticky top-0 z-10 bg-slate-50 border-b text-left px-4 py-2">Archivo</th>
+                <th className="sticky top-0 z-10 bg-slate-50 border-b text-left px-4 py-2">Origen</th>
+                <th className="sticky top-0 z-10 bg-slate-50 border-b text-left px-4 py-2">Tipo</th>
+                <th className="sticky top-0 z-10 bg-slate-50 border-b text-left px-4 py-2">Proveedor</th>
+                <th className="sticky top-0 z-10 bg-slate-50 border-b text-left px-4 py-2">Factura</th>
+                <th className="sticky top-0 z-10 bg-slate-50 border-b text-right px-4 py-2">Total</th>
+                <th className="sticky top-0 z-10 bg-slate-50 border-b text-left px-4 py-2">Estado</th>
+                <th className="sticky top-0 z-10 bg-slate-50 border-b text-left px-4 py-2">Recibido</th>
+                {isAdmin && (
+                  <th className="sticky top-0 right-0 z-20 bg-slate-50 border-b border-l px-4 py-2 shadow-[-6px_0_6px_-4px_rgba(0,0,0,0.08)]">
+                    Acciones
+                  </th>
+                )}
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody>
               {data.items.map((d) => (
-                <tr key={d.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-2 text-slate-500">{d.id}</td>
-                  <td className="px-4 py-2">
+                <tr key={d.id} className="group">
+                  <td className="bg-white group-hover:bg-slate-50 border-b px-4 py-2 text-slate-500">{d.id}</td>
+                  <td className="bg-white group-hover:bg-slate-50 border-b px-4 py-2">
                     <Link to={`/documents/${d.id}`} className="text-brand-700 hover:underline truncate inline-block max-w-[16rem]">
                       {d.original_filename}
                     </Link>
                   </td>
-                  <td className="px-4 py-2 text-xs">{d.source_type}</td>
-                  <td className="px-4 py-2 text-xs">{d.doc_kind}</td>
-                  <td className="px-4 py-2 truncate max-w-[12rem]">{d.proveedor_nombre || '-'}</td>
-                  <td className="px-4 py-2">{d.numero_factura || '-'}</td>
-                  <td className="px-4 py-2 text-right">
+                  <td className="bg-white group-hover:bg-slate-50 border-b px-4 py-2 text-xs">{d.source_type}</td>
+                  <td className="bg-white group-hover:bg-slate-50 border-b px-4 py-2 text-xs">{d.doc_kind}</td>
+                  <td className="bg-white group-hover:bg-slate-50 border-b px-4 py-2 truncate max-w-[12rem]">{d.proveedor_nombre || '-'}</td>
+                  <td className="bg-white group-hover:bg-slate-50 border-b px-4 py-2">{d.numero_factura || '-'}</td>
+                  <td className="bg-white group-hover:bg-slate-50 border-b px-4 py-2 text-right">
                     {d.total != null ? `${d.moneda || ''} ${Number(d.total).toLocaleString('es-CR', { minimumFractionDigits: 2 })}` : '-'}
                   </td>
-                  <td className="px-4 py-2"><StatusBadge status={d.status} /></td>
-                  <td className="px-4 py-2 text-xs text-slate-500">
+                  <td className="bg-white group-hover:bg-slate-50 border-b px-4 py-2"><StatusBadge status={d.status} /></td>
+                  <td className="bg-white group-hover:bg-slate-50 border-b px-4 py-2 text-xs text-slate-500">
                     {new Date(d.received_at).toLocaleString('es-CR')}
                   </td>
                   {isAdmin && (
-                    <td className="px-4 py-2 text-right whitespace-nowrap">
+                    <td className="sticky right-0 z-10 bg-white group-hover:bg-slate-50 border-b border-l px-4 py-2 text-right whitespace-nowrap shadow-[-6px_0_6px_-4px_rgba(0,0,0,0.08)]">
                       <button
                         onClick={() => handleDelete(d)}
                         disabled={deleteMutation.isPending}
-                        className="text-xs text-red-600 hover:text-red-800 disabled:opacity-50"
+                        className="text-xs font-medium text-red-600 hover:text-red-800 disabled:opacity-50"
                         title="Eliminar documento (libera hash para resubir)"
                       >
                         Eliminar
