@@ -12,18 +12,17 @@ Implementacion v2.1 del Plan Maestro. Esta fase entrega la fundacion end-to-end 
 
 ## 2. Paso 1 obligatorio: bootstrap MySQL (UNA sola vez)
 
-Abrir MySQL Workbench conectado como `root` y ejecutar el script:
+1. Abra `backend/src/db/migrations/000_create_user_and_db.sql` en un editor.
+2. Reemplace el placeholder `__REEMPLAZAR_CON_DB_PASSWORD_DEL_ENV__` por una password fuerte propia.
+3. Ponga **exactamente la misma password** en `backend/.env` bajo `DB_PASSWORD`.
+4. Abra MySQL Workbench conectado como `root` y ejecute el script.
 
-```
-backend/src/db/migrations/000_create_user_and_db.sql
-```
-
-Eso crea:
+El script crea:
 - Base de datos `docscan_finance`
-- Usuario `app_user@localhost` con password `AppUser_DocScan_2026!` (coincide con `backend/.env`)
+- Usuario `app_user@localhost` con la password que usted definio
 - GRANTS sobre la base.
 
-Si quiere otra password, cambiela tanto en el SQL como en `backend/.env` (campo `DB_PASSWORD`).
+> Nunca commitee el SQL con su password real. Si modifica el archivo localmente, no lo suba al repo con el valor real.
 
 ## 3. Paso 2: aplicar migraciones y seed
 
@@ -35,11 +34,11 @@ npm run db:seed
 
 `db:migrate` crea las 16 tablas del modelo (`documents`, `invoices`, `invoice_lines`, `raw_ocr`, `raw_xml`, `ai_extractions`, `processing_trace`, `excel_mapping`, `manual_edits`, `rag_documents`, `rag_queries`, `currency_rates`, `users`, `clients`, `income_invoices`, `payments`, `chatbot_queries`).
 
-`db:seed` crea el usuario ADMIN bootstrap:
-- Email:    `admin@docscan.local`
-- Password: `ChangeMe123!`
+`db:seed` crea el usuario ADMIN bootstrap a partir de `BOOTSTRAP_ADMIN_EMAIL` y
+`BOOTSTRAP_ADMIN_PASSWORD` definidos en `backend/.env`. Estos valores DEBE ponerlos
+usted; el repo no incluye una password por defecto.
 
-Cambielo despues del primer login. La password real esta en `backend/.env` (`BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD`).
+Cambie la password del admin desde la UI inmediatamente despues del primer login.
 
 ## 4. Paso 3: arrancar servicios
 
@@ -61,7 +60,7 @@ cd frontend
 npm run dev
 ```
 
-Verifique: http://localhost:5173 abre el login. Use `admin@docscan.local` / `ChangeMe123!`.
+Verifique: http://localhost:5173 abre el login. Use el correo y password que definio en `BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD` del `.env`.
 
 ### Terminal C - n8n (puerto 5678)
 

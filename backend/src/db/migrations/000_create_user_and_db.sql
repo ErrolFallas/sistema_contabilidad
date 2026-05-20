@@ -9,10 +9,12 @@ CREATE DATABASE IF NOT EXISTS docscan_finance
   CHARACTER SET utf8mb4
   COLLATE utf8mb4_unicode_ci;
 
--- 2. Crear usuario dedicado (cambiar password si lo desea)
---    La password usada aqui DEBE coincidir con DB_PASSWORD del .env
+-- 2. Crear usuario dedicado
+--    OBLIGATORIO: Antes de ejecutar este script reemplace el placeholder de abajo
+--    por una password fuerte propia, y ponga EXACTAMENTE la misma en backend/.env
+--    bajo la variable DB_PASSWORD. Nunca dejar el placeholder en produccion.
 CREATE USER IF NOT EXISTS 'app_user'@'localhost'
-  IDENTIFIED BY 'AppUser_DocScan_2026!';
+  IDENTIFIED BY '__REEMPLAZAR_CON_DB_PASSWORD_DEL_ENV__';
 
 -- 3. Permisos sobre la base
 GRANT ALL PRIVILEGES ON docscan_finance.* TO 'app_user'@'localhost';

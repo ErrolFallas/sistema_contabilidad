@@ -30,7 +30,7 @@
           "parameters": [
             {
               "name": "X-N8N-Token",
-              "value": "dev-n8n-token-please-change-9f7e3a1c5b2d4f8e6a3c1b9d7e5f2a4c"
+              "value": "REEMPLAZAR_CON_N8N_INGEST_TOKEN_DE_BACKEND_ENV"
             },
             {
               "name": "Content-Type",

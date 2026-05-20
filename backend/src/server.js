@@ -1,8 +1,9 @@
 const { buildApp } = require('./app');
-const { config } = require('./config/env');
+const { config, validateRequiredSecrets } = require('./config/env');
 const { ping } = require('./db/pool');
 
 async function start() {
+  validateRequiredSecrets();
   const app = buildApp();
 
   try {

@@ -19,7 +19,7 @@ export default function LoginPage() {
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(schema),
-    defaultValues: { email: 'admin@docscan.local', password: 'ChangeMe123!' },
+    defaultValues: { email: '', password: '' },
   });
 
   async function onSubmit(values) {
@@ -70,10 +70,6 @@ export default function LoginPage() {
             {isSubmitting ? 'Ingresando...' : 'Ingresar'}
           </button>
         </form>
-
-        <p className="mt-4 text-xs text-slate-400">
-          Bootstrap admin: admin@docscan.local / ChangeMe123!
-        </p>
       </div>
     </div>
   );

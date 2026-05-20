@@ -26,7 +26,7 @@ const config = {
   },
 
   jwt: {
-    secret: req('JWT_SECRET', 'dev-secret'),
+    secret: req('JWT_SECRET', ''),
     expiresIn: req('JWT_EXPIRES_IN', '8h'),
   },
 
@@ -74,4 +74,21 @@ const config = {
   },
 };
 
-module.exports = { config };
+const REQUIRED_SECRETS = [
+  ['DB_PASSWORD', config.db.password],
+  ['JWT_SECRET', config.jwt.secret],
+  ['N8N_INGEST_TOKEN', config.n8n.ingestToken],
+];
+
+function validateRequiredSecrets({ throwOnMissing = true } = {}) {
+  const missing = REQUIRED_SECRETS.filter(([, v]) => !v).map(([name]) => name);
+  if (missing.length === 0) return { ok: true, missing: [] };
+  const msg =
+    `[config] Variables obligatorias ausentes en .env: ${missing.join(', ')}. ` +
+    `Defina valores en backend/.env (ver backend/.env.example) y reinicie.`;
+  if (throwOnMissing) throw new Error(msg);
+  console.error(msg);
+  return { ok: false, missing };
+}
+
+module.exports = { config, validateRequiredSecrets };

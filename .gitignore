@@ -1,0 +1,49 @@
+# ============================================================
+# .gitignore raiz - DocScan Finance CR
+# Bloquea credenciales, configuracion local y artefactos.
+# Los .env reales se ignoran en backend/.gitignore y frontend/.gitignore.
+# ============================================================
+
+# Secretos y configuracion local (NUNCA versionar)
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+credentials.json
+service-account.json
+token.json
+google-credentials.json
+
+# Configuracion local del entorno Claude Code / editor
+.claude/settings.local.json
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Caches y logs
+npm-cache/
+node_modules/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm/
+.pnpm-debug.log*
+
+# Build / dist
+dist/
+build/
+.vite/
+coverage/
+
+# SO
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Backups locales
+*.bak
+*.orig
+*.tmp

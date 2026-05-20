@@ -23,9 +23,9 @@ Cada poll en el backend:
 2. Click **+ Add workflow** (o `Ctrl+N`).
 3. Click los tres puntos arriba a la derecha > **Import from File**.
 4. Seleccione `DriveIngest.json`.
-5. (Importante) **Verifique el header `X-N8N-Token`**: el valor del JSON es el del `.env` del backend (`N8N_INGEST_TOKEN`). Si lo cambia en `.env`, debe actualizarlo aqui tambien.
+5. **OBLIGATORIO** - El JSON trae un placeholder `REEMPLAZAR_CON_N8N_INGEST_TOKEN_DE_BACKEND_ENV` en el header `X-N8N-Token`. Abra el nodo HTTP Request y reemplace ese valor por el `N8N_INGEST_TOKEN` que definio en `backend/.env`. Si no lo hace, el backend rechazara las llamadas con 401.
 6. Click **Active** (toggle arriba a la derecha) para activarlo.
-7. Repita con `GmailIngest.json`.
+7. Repita con `GmailIngest.json` y `TipoCambioBCCR.json`.
 
 ## Pre-requisitos
 
@@ -39,7 +39,7 @@ Antes de activar los workflows, en la app:
 ## Notas
 
 - El `Authorization` por header `X-N8N-Token` reemplaza JWT en estos endpoints porque
-  n8n no inicia sesion como usuario. El token vive en `.env` (`N8N_INGEST_TOKEN`).
-- Si renueva el token en `.env`, debe rehacer el header en los dos workflows.
+  n8n no inicia sesion como usuario. El token vive en `.env` (`N8N_INGEST_TOKEN`) y NUNCA en git.
+- Si renueva el token en `.env`, debe rehacer el header en los tres workflows desde la UI de n8n.
 - Los workflows `TipoCambioBCCR` y `ReprocesoErrores` mencionados en el plan v2.1 (seccion 14.4)
   se agregan en una sub-fase posterior.
