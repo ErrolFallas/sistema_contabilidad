@@ -9,11 +9,14 @@ API REST en Node.js + Express. Implementa el procesamiento documental contable e
   - **MANUAL**: `POST /api/documents/upload` (multipart, autenticacion JWT).
   - **DRIVE**: `POST /api/integrations/poll-drive` (autenticacion `X-N8N-Token`, disparado por n8n cada 40 s o por la UI del admin).
   - **GMAIL**: `POST /api/integrations/poll-gmail` (idem).
-- Ejecuta pipeline: hash + dedup -> OCR -> Gemini -> validacion + conversion monetaria -> MySQL -> Excel.
-- Persiste auditoria completa: `raw_ocr`, `ai_extractions`, `processing_trace`, `excel_mapping`, `manual_edits`.
+- Ejecuta pipeline: hash + dedup binario -> OCR -> IA (clasifica + extrae) -> dedup por numero de factura -> validaciones aritmeticas + conversion monetaria -> MySQL -> Excel -> indexado para busqueda inteligente.
+- Persiste auditoria completa: `raw_ocr`, `ai_extractions`, `processing_trace`, `excel_mapping`, `manual_edits`, `rag_documents`, `rag_queries`.
 - Gestion de usuarios con roles ADMIN/USUARIO y limite de 3 administradores simultaneos.
 - Conexion OAuth con Google para Drive y Gmail desde la UI del admin.
 - Genera la plantilla Excel "Reintegro de Caja Chica" en `storage/processed/`.
+- Cron diario de limpieza de almacenamiento + endpoint manual de mantenimiento.
+- Logs estructurados con pino + request_id por request.
+- 32 tests automatizados con vitest + supertest.
 
 ## Estructura
 
@@ -21,53 +24,76 @@ API REST en Node.js + Express. Implementa el procesamiento documental contable e
 backend/
 ├── package.json
 ├── .env.example
+├── vitest.config.js
+├── tests/                              tests automatizados (vitest + supertest)
+│   ├── setup.js                        carga .env, silencia pino, cierra pool al final
+│   ├── helpers.js                      getApp + loginAsAdmin
+│   ├── health.test.js
+│   ├── auth.test.js
+│   ├── documents.test.js
+│   ├── dashboard.test.js
+│   ├── traceability.test.js
+│   └── rag.test.js
 ├── templates/
 │   └── Reintegro.xlsx                  machote del Reintegro de Caja Chica
 ├── storage/                            git-ignored
 │   ├── uploads/                        archivos recibidos
-│   ├── ocr/                            (futuro) volcados OCR en disco
+│   ├── ocr/                            volcados OCR en disco (futuro)
 │   ├── processed/                      Reintegro_actualizado.xlsx + sidecar .session
 │   ├── errors/                         archivos que fallaron el pipeline
 │   └── temp/                           scratch de procesos intermedios
 └── src/
-    ├── server.js                       entry point: arranca app + verifica MySQL
-    ├── app.js                          configuracion de Express + montaje de rutas
+    ├── server.js                       entry point: app + ping MySQL + cron de limpieza
+    ├── app.js                          configuracion Express + montaje de rutas
+    ├── lib/
+    │   └── logger.js                   pino root logger con redact de secretos
     ├── config/
     │   └── env.js                      carga .env y expone config tipado
     ├── db/
     │   ├── pool.js                     mysql2 pool con verificacion
     │   ├── migrate.js                  runner de migrations
     │   ├── seed.js                     crea ADMIN bootstrap
-    │   └── migrations/                 *.sql aplicados en orden alfabetico
-    │       ├── 000_create_user_and_db.sql      (manual, una vez como root)
-    │       ├── 001_initial_schema.sql
-    │       ├── 002_google_credentials.sql
-    │       └── 003_widen_gmail_attachment_id.sql
+    │   └── migrations/                 *.sql aplicados en orden
     ├── middleware/
     │   ├── auth.js                     JWT, requireRole, ingestTokenRequired
     │   ├── upload.js                   multer + filtro mime
+    │   ├── requestLogger.js            req.id + req.log + X-Request-Id
     │   └── errorHandler.js             notFound + handler global
     ├── controllers/
-    │   ├── authController.js           login + me
+    │   ├── authController.js           login + me + change password
     │   ├── googleAuthController.js     authorize, callback, status, disconnect
-    │   ├── documentsController.js      upload, list, detail, trace, downloadReintegro, remove, resetReintegro, bulkRemove
+    │   ├── documentsController.js      upload, list (filtros), detail, trace, download, remove, bulkRemove, resetReintegro, reprocess
     │   ├── usersController.js          list, create, update (con limite 3 ADMIN)
-    │   └── integrationsController.js   pollDrive, pollGmail, ensureDriveStructure, fetchCurrency, listCurrency
+    │   ├── integrationsController.js   pollDrive, pollGmail, ensureDriveStructure, fetchCurrency, listCurrency
+    │   ├── dashboardController.js      stats (totales, IVA por tarifa, top proveedores, mensual)
+    │   ├── traceabilityController.js   vista global + stats (by_status, by_stage, stage_durations)
+    │   ├── editsController.js          PATCH invoices/lines + listEdits (audit en manual_edits)
+    │   ├── ragController.js            query, reindex one/all, status, history
+    │   └── adminController.js          runStorageCleanup + listOrphans
     ├── routes/
     │   ├── healthRoutes.js             /api/health
     │   ├── authRoutes.js               /api/auth/*
     │   ├── documentsRoutes.js          /api/documents/*
     │   ├── usersRoutes.js              /api/users/*
-    │   └── integrationsRoutes.js       /api/integrations/*
+    │   ├── integrationsRoutes.js       /api/integrations/*
+    │   ├── dashboardRoutes.js          /api/dashboard/*
+    │   ├── traceabilityRoutes.js       /api/traceability/*
+    │   ├── invoicesRoutes.js           /api/invoices/:id (PATCH)
+    │   ├── invoiceLinesRoutes.js       /api/invoice-lines/:id (PATCH)
+    │   ├── ragRoutes.js                /api/rag/*
+    │   └── adminRoutes.js              /api/admin/storage/*
     └── services/
         ├── hashService.js              SHA256 + documentHashFull
         ├── traceService.js             withStage, traceStart/end/instant
         ├── storageService.js           rutas de storage
+        ├── storageCleanupService.js    cleanOldTempFiles + cleanOrphanedUploads + detectOrphans
         ├── ocrService.js               pdf-parse + sharp + tesseract.js
-        ├── geminiService.js            cliente Gemini con prompt restrictivo
+        ├── geminiService.js            cliente Gemini con prompt restrictivo (clasificacion + extraccion)
         ├── currencyService.js          tipo de cambio Hacienda CR
+        ├── validationService.js        chequeos aritmeticos cruzados (subtotal+IVA=total, etc)
         ├── excelService.js             ExcelJS para machote Reintegro
         ├── pipelineService.js          orquesta todo el flujo
+        ├── ragService.js               chunking + embeddings + cosine + chat con contexto
         ├── googleOAuthService.js       authorize URL + tokens + refresh
         ├── driveService.js             listar, descargar, mover en Drive
         └── gmailService.js             listar UNREAD, descargar adjunto, markAsRead
@@ -75,45 +101,18 @@ backend/
 
 ## Como poner en marcha
 
-### Requisitos previos
+Detalle paso a paso para clonar desde cero en [`../INSTALACION.md`](../INSTALACION.md). Para reabrir tras un cierre limpio: [`../INICIO-RAPIDO.md`](../INICIO-RAPIDO.md).
 
-- Node.js 20+
-- MySQL Server nativo Windows (servicio MySQL80)
-- MySQL Workbench (para ejecutar el SQL de bootstrap)
-
-### Instalacion
+Resumen rapido:
 
 ```powershell
 cd backend
 npm install
-cp .env.example .env       # editar variables
-```
-
-### Base de datos
-
-1. Abrir MySQL Workbench como **root**.
-2. Ejecutar `src/db/migrations/000_create_user_and_db.sql`. Esto crea la base `docscan_finance` y el usuario `app_user`.
-3. Aplicar el resto de migraciones y seed:
-
-```powershell
+copy .env.example .env       # editar variables
+# (UNA vez) ejecutar 000_create_user_and_db.sql en MySQL Workbench como root
 npm run db:migrate
 npm run db:seed
-```
-
-`db:seed` crea el usuario ADMIN bootstrap. Las credenciales se toman de `BOOTSTRAP_ADMIN_EMAIL` y `BOOTSTRAP_ADMIN_PASSWORD` del `.env`. **Cambielas tras el primer login.**
-
-### Arrancar
-
-```powershell
-npm run dev     # nodemon, hot reload
-# o
-npm start       # produccion
-```
-
-Backend escucha en `http://localhost:3000`. Verifique:
-
-```powershell
-curl http://localhost:3000/api/health
+npm run dev                  # puerto 3000
 ```
 
 ## Variables de entorno (`.env`)
@@ -124,8 +123,9 @@ Plantilla completa en `.env.example`. Cada variable:
 |---|---|
 | `NODE_ENV` | development / production |
 | `PORT` | Puerto HTTP (default 3000) |
+| `LOG_LEVEL` | Nivel pino: trace/debug/info/warn/error/fatal/silent. Default: debug en dev, info en prod. |
 | `GEMINI_API_KEY` | API key de Google AI Studio |
-| `GEMINI_MODEL` | Modelo Gemini (default `gemini-2.5-flash`) |
+| `GEMINI_MODEL` | Modelo de extraccion/chat (default `gemini-2.5-flash`) |
 | `GOOGLE_CLIENT_ID` / `SECRET` | OAuth 2.0 Web Client de Google Cloud Console |
 | `GOOGLE_REDIRECT_URI` | `http://localhost:3000/api/auth/google/callback` |
 | `DRIVE_ROOT_FOLDER_NAME` | Nombre de la carpeta raiz en Drive (`DocScanFinanceCR`) |
@@ -134,9 +134,11 @@ Plantilla completa en `.env.example`. Cada variable:
 | `JWT_EXPIRES_IN` | Duracion del token (`8h`) |
 | `BOOTSTRAP_ADMIN_EMAIL/PASSWORD` | Admin inicial de seed |
 | `N8N_INGEST_TOKEN` | Token compartido con n8n para los polls |
+| `BCCR_INDICADOR_VENTA/COMPRA` | IDs de indicadores BCCR (default 318/317) |
+| `STORAGE_DIR` | Carpeta base de storage (`./storage`) |
 | `EXCEL_TEMPLATE_REINTEGRO` | Ruta del machote (`./templates/Reintegro.xlsx`) |
 
-**Nunca** versione el `.env` real (esta en `.gitignore`).
+**Nunca** versiones el `.env` real (esta en `.gitignore`).
 
 ## Endpoints REST principales
 
@@ -146,6 +148,7 @@ Plantilla completa en `.env.example`. Cada variable:
 |---|---|---|---|
 | POST | `/api/auth/login` | publica | - |
 | GET | `/api/auth/me` | JWT | cualquiera |
+| PATCH | `/api/auth/password` | JWT | cualquiera (cambia su propio password) |
 | GET | `/api/auth/google/status` | JWT | cualquiera |
 | POST | `/api/auth/google/authorize` | JWT | ADMIN |
 | GET | `/api/auth/google/callback` | publica (Google redirige) | - |
@@ -156,14 +159,45 @@ Plantilla completa en `.env.example`. Cada variable:
 | Metodo | Ruta | Auth | Rol |
 |---|---|---|---|
 | POST | `/api/documents/upload` | JWT | cualquiera |
-| GET | `/api/documents` | JWT | cualquiera |
+| GET | `/api/documents?status=...&source=...&from=...&to=...&search=...` | JWT | cualquiera |
 | GET | `/api/documents/:id` | JWT | cualquiera |
 | GET | `/api/documents/:id/trace` | JWT | cualquiera |
+| GET | `/api/documents/:id/edits` | JWT | cualquiera |
 | GET | `/api/documents/reintegro/download` | JWT | cualquiera |
+| POST | `/api/documents/:id/reprocess` | JWT | ADMIN |
 | DELETE | `/api/documents/:id` | JWT | ADMIN |
 | DELETE | `/api/documents/reintegro/reset` | JWT | ADMIN |
 | DELETE | `/api/documents` (header `X-Confirm-Bulk-Delete: ELIMINAR`) | JWT | ADMIN |
 | POST | `/api/documents/ingest` | `X-N8N-Token` | - |
+
+### Edicion auditada
+
+| Metodo | Ruta | Auth | Rol |
+|---|---|---|---|
+| PATCH | `/api/invoices/:id` | JWT | ADMIN |
+| PATCH | `/api/invoice-lines/:id` | JWT | ADMIN |
+
+### Panel principal
+
+| Metodo | Ruta | Auth |
+|---|---|---|
+| GET | `/api/dashboard/stats` | JWT |
+
+### Trazabilidad
+
+| Metodo | Ruta | Auth |
+|---|---|---|
+| GET | `/api/traceability?status=...&source=...&current_stage=...&from=...&to=...` | JWT |
+
+### Consulta inteligente (RAG)
+
+| Metodo | Ruta | Auth | Rol |
+|---|---|---|---|
+| GET | `/api/rag/status` | JWT | cualquiera |
+| POST | `/api/rag/query` | JWT | cualquiera |
+| GET | `/api/rag/history` | JWT | cualquiera |
+| POST | `/api/rag/reindex/:id` | JWT | ADMIN |
+| POST | `/api/rag/reindex-all` | JWT | ADMIN |
 
 ### Usuarios
 
@@ -186,6 +220,13 @@ Plantilla completa en `.env.example`. Cada variable:
 | POST | `/api/integrations/currency/fetch` | JWT ADMIN |
 | GET | `/api/integrations/currency` | JWT |
 
+### Administracion del almacenamiento
+
+| Metodo | Ruta | Auth | Rol |
+|---|---|---|---|
+| POST | `/api/admin/storage/cleanup` | JWT | ADMIN |
+| GET | `/api/admin/storage/orphans` | JWT | ADMIN |
+
 ## Pipeline documental
 
 ```
@@ -193,7 +234,7 @@ processFile(file)
    |
    v
  1. fileSha256(filePath)
- 2. SELECT documents WHERE document_hash = ?      -- dedup
+ 2. SELECT documents WHERE document_hash = ?      -- dedup binario
  3. INSERT documents (status='PROCESSING')        -- trace FILE_RECEIVED
  4. runOcrForDocument()                           -- trace OCR_START/OCR_DONE
        - PDF nativo -> pdf-parse
@@ -201,21 +242,35 @@ processFile(file)
        - Imagen -> sharp + tesseract.js
        - INSERT raw_ocr (inmutable)
  5. extractInvoiceFromOcr()                       -- trace GEMINI_START/GEMINI_DONE
-       - INSERT ai_extractions (prompt+response+score+modelo)
+       - INSERT ai_extractions (prompt + respuesta + modelo + duracion)
+       - Devuelve tipo_documento (FACTURA/REPORTE/OTRO) ademas de los campos
+ 5.4 Branch por tipo_documento:
+       - Si es REPORTE u OTRO -> documents.status='REVIEW', error_message
+         con prefijo [REPORTE] o [OTRO], skip excel. Return.
+ 5.5 Dedup por numero de factura + proveedor:
+       - SELECT invoices WHERE numero_factura+proveedor coincide
+       - Si match -> documents.status='DUPLICATE', skip excel. Return.
  6. INSERT invoices + invoice_lines                -- trace MYSQL_DONE
- 7. currencyService.ensureRate()                   -- trace VALIDATION_DONE
+ 6.5 Indexa async para RAG (no bloquea respuesta)
+ 7. currencyService.ensureRate()                   -- dentro de VALIDATION_DONE
        - UPDATE invoices SET tipo_cambio, total_colones (si moneda <> CRC)
+ 7.5 validationService.runArithmeticValidation()
+       - subtotal - descuento + impuesto_total = total
+       - SUM(line.total) = invoice.total
+       - base * porcentaje/100 = monto_iva por linea
+       - INSERT ai_extractions (purpose=VALIDATION) con issues
+       - Si hay issues -> invoices.estado_extraccion = 'REVISION'
  8. appendToReintegro()                            -- trace EXCEL_START/EXCEL_DONE
        - Solo si invoice tiene datos extraibles
        - INSERT excel_mapping por celda
  9. UPDATE documents SET status='COMPLETED' o 'REVIEW'
 ```
 
-Cualquier error en una etapa: documento queda en `ERROR` y `processing_trace` registra el detalle. n8n reintentara en el siguiente poll.
+Cualquier error en una etapa: documento queda en `ERROR` y `processing_trace` registra el detalle. n8n reintentara en el siguiente poll, o admin puede usar `POST /api/documents/:id/reprocess` desde la UI.
 
 ## Servicios externos
 
-- **Gemini** (`@google/generative-ai`): extraccion estructurada de facturas con prompt restrictivo. Tier gratuito de Google AI Studio.
+- **Gemini** (`@google/generative-ai`): extraccion estructurada con prompt restrictivo + embeddings (`gemini-embedding-001`) + chat con contexto para RAG. Tier gratuito de Google AI Studio. Una sola API key cubre los tres usos.
 - **Hacienda CR** (`api.hacienda.go.cr/indicadores/tc/dolar`): tipo de cambio USD diario. Sin token.
 - **Google Drive API v3**: listar carpeta `/Facturas`, descargar archivos, mover a `/Procesadas` o `/Errores`.
 - **Google Gmail API v1**: listar UNREAD con `has:attachment`, descargar adjuntos, marcar como leido.
@@ -224,12 +279,32 @@ Cualquier error en una etapa: documento queda en `ERROR` y `processing_trace` re
 
 - Todas las rutas excepto `/login` y el callback OAuth requieren JWT Bearer.
 - Endpoints de integracion usan token compartido `X-N8N-Token`.
-- bcryptjs con cost 12 para passwords.
+- bcryptjs para passwords.
 - helmet + cors + express-rate-limit (300 req/min por IP en `/api/`).
 - Validacion de entrada con zod.
 - Multer limita uploads a 25 MB y filtra mime types permitidos.
 - bulk delete requiere header de confirmacion explicito.
 - Backend nunca expone `password_hash` en ninguna respuesta.
+- Logger pino redacta `Authorization`, `X-N8N-Token`, `Cookie`, `password`, `token`, secretos del env (`JWT_SECRET`, `N8N_INGEST_TOKEN`, `DB_PASSWORD`, `GEMINI_API_KEY`, `GOOGLE_CLIENT_SECRET`).
+- Header `X-Request-Id` (UUID v4) en cada respuesta para trazabilidad cliente <-> servidor.
+- Cambio de password propio: backend valida el password actual con bcrypt antes de hashear el nuevo.
+
+## Tests automatizados
+
+```powershell
+npm test            # corre una vez
+npm run test:watch  # modo watch para TDD
+```
+
+32 tests en 6 archivos:
+- `health.test.js` - endpoint /api/health y X-Request-Id
+- `auth.test.js` - login, /me, change password (error paths)
+- `documents.test.js` - list con filtros, detail
+- `dashboard.test.js` - stats con sanity checks
+- `traceability.test.js` - list con filtros + stats
+- `rag.test.js` - status + query rechazos + history (sin happy path para no quemar quota)
+
+Tests usan vitest + supertest contra `buildApp()` sin abrir puerto. Pool MySQL cerrado en `afterAll`. CI/CD pendiente (necesita test DB).
 
 ## Tablas MySQL
 
@@ -245,22 +320,25 @@ Detalle de columnas y FKs en los archivos SQL de `src/db/migrations/`.
 - Servicios sin estado (sin singletons mutables) excepto el OAuth state cache.
 - Validacion de input siempre con zod en controllers (no en services).
 - Sin comentarios obvios; solo explicar **por que** cuando no es evidente.
+- Tests requeridos para nuevos endpoints publicos (smoke + happy path + 1-2 error paths).
 
 ## Como diagnosticar problemas
 
 1. `GET /api/health` -> verifica MySQL, credenciales Gemini/Google/n8n.
-2. `GET /api/documents/:id/trace` -> timeline detallado del documento, etapa fallida marcada como ERROR.
-3. Revisar logs del proceso `npm run dev`: errores con stack en development.
+2. `GET /api/documents/:id/trace` -> timeline detallado, etapa fallida marcada como ERROR.
+3. Mirar logs en la terminal de `npm run dev`. Cada request tiene un `req_id` UUID. Si una respuesta dio error 500, busca ese UUID en los logs para ver el stack completo.
 4. Inspeccionar `processing_trace.message` para detalle del error.
-5. Si un documento queda en `PROCESSING` mucho tiempo, el OCR escaneado puede tardar 30-90 s; consultar la traza.
+5. Si un documento queda en `PROCESSING` mucho tiempo: OCR escaneado puede tardar 30-90 s; o Gemini saturado (espera y reintenta con "Reprocesar" desde el detalle).
 
-## Reglas inviolables (recordatorio rapido)
+## Reglas inviolables (recordatorio)
 
 - IA solo extrae lo visible (null si no esta).
 - OCR no se edita despues de persistido.
 - Excel es solo reporte; MySQL es la fuente.
-- Hash documental previene duplicados Drive vs Gmail.
+- Hash documental + dedup por numero de factura previene duplicados Drive vs Gmail vs re-escaneos.
 - Maximo 3 administradores activos.
 - Conversion monetaria no se recalcula sobre facturas viejas.
+- Validaciones aritmeticas NO corrigen los valores; solo flagean (`estado_extraccion = 'REVISION'`).
+- Edicion manual nunca borra el valor anterior (queda en `manual_edits`).
 - Gmail solo se marca como leido si todos los adjuntos pasaron sin error.
 - n8n nunca toca MySQL/OCR/IA/Excel directamente; solo dispara los endpoints.

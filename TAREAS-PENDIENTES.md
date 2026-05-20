@@ -1,4 +1,4 @@
-# ROADMAP - DocScan Finance CR
+# TAREAS PENDIENTES - DocScan Finance CR
 
 Lista viva de lo que falta y de mejoras conocidas. Marcar con `[x]` al completar.
 
@@ -253,7 +253,7 @@ Lista viva de lo que falta y de mejoras conocidas. Marcar con `[x]` al completar
 
 Cuando vuelva a abrir el proyecto, abrir este archivo y pedir a Claude:
 
-> "Lee `ROADMAP.md`. Vamos a trabajar en el item **X** de la seccion **Y**. Antes de empezar, recordame que reglas del plan v2.1 afectan a esta tarea."
+> "Lee `TAREAS-PENDIENTES.md`. Vamos a trabajar en el item **X** de la seccion **Y**. Antes de empezar, recordame que reglas del plan v2.1 afectan a esta tarea."
 
 Claude debe responder con las restricciones aplicables (de `README.md` o de los memos en `memory/`), y luego planificar.
 

@@ -1,229 +1,121 @@
 # DocScan Finance CR
 
-Plataforma documental contable inteligente para Costa Rica. Procesa facturas (PDF, JPG, PNG, XML de Hacienda) provenientes de Google Drive, Gmail o carga manual, las extrae con OCR + IA controlada, persiste en MySQL, completa una plantilla Excel de Reintegro de Caja Chica y expone consultas, edicion auditada y trazabilidad desde un panel web.
+Plataforma documental contable para Costa Rica. Procesa facturas (PDF, imagen) recibidas por Google Drive, Gmail o carga manual: las lee con OCR, las interpreta con IA, las valida aritmeticamente, las anota en una hoja Excel de Reintegro de Caja Chica y permite consultarlas en lenguaje natural desde un panel web.
 
-## Vision general
+## Documentos guia (para humanos)
+
+| Archivo | Cuando leerlo |
+|---|---|
+| [`INSTALACION.md`](INSTALACION.md) | **Primer uso**: clonaste el repo y queres dejar todo corriendo de cero. |
+| [`INICIO-RAPIDO.md`](INICIO-RAPIDO.md) | **Ya lo instalaste**: queres volver a abrir el sistema un dia despues, una semana despues, etc. |
+| [`TAREAS-PENDIENTES.md`](TAREAS-PENDIENTES.md) | Lista viva de items completados e ideas futuras. Marca `[x]`/`[ ]`. |
+| [`backend/README.md`](backend/README.md) | Detalle tecnico del backend (endpoints, servicios, modelo de datos). |
+| [`frontend/README.md`](frontend/README.md) | Detalle tecnico del frontend (rutas, componentes, patrones). |
+| [`n8n-workflows/README.md`](n8n-workflows/README.md) | Como importar y activar los workflows de n8n. |
+
+## Que hace en una vista
 
 ```
 Drive / Gmail / Carga manual
         |
         v
-   n8n (cron 40 s) ---> Backend Node.js -+-> OCR (Tesseract local o pdf-parse)
-                                         |
-                                         +-> Gemini (extraccion estricta + clasificacion IVA)
-                                         |
-                                         +-> MySQL (auditoria completa)
-                                         |
-                                         +-> Excel (modo Reintegro)
-                                         |
-                                         +-> Hacienda CR (tipo de cambio diario)
-                                         v
-                                    React + Tailwind (UI)
+   n8n (cron 40s)  ─► Backend Node.js ─┬─► OCR (tesseract o pdf-parse)
+                                       │
+                                       ├─► IA (extraccion estricta + clasificacion IVA)
+                                       │
+                                       ├─► Validacion aritmetica (subtotal+IVA=total)
+                                       │
+                                       ├─► MySQL (auditoria completa)
+                                       │
+                                       ├─► Excel (Reintegro de Caja Chica)
+                                       │
+                                       ├─► Indexado para busqueda inteligente
+                                       │
+                                       └─► Hacienda CR (tipo de cambio diario)
+                                       v
+                                React + Tailwind (UI)
 ```
 
-## Stack tecnologico (Plan Maestro v2.1)
+## Stack
 
 | Capa | Tecnologia |
 |---|---|
 | Backend | Node.js 20+ / Express |
-| Backend libs | mysql2, ExcelJS, Multer, tesseract.js, pdf-parse v2, sharp, fast-xml-parser, @google/generative-ai, googleapis, axios, jsonwebtoken, bcryptjs, helmet, cors, zod |
-| Frontend | React 19 + Vite + TailwindCSS v3 + React Router + @tanstack/react-query + axios + Zustand + react-hook-form + zod + recharts |
-| IA | Gemini (Google AI Studio - tier gratuito) - extraccion, clasificacion IVA, RAG, chat |
-| Base de datos | MySQL Server nativo Windows + MySQL Workbench |
-| Automatizacion | n8n via npm install local (sin Docker) |
+| Frontend | React 19 + Vite + TailwindCSS v3 |
+| Base de datos | MySQL Server nativo Windows |
+| Automatizacion | n8n (instalado por npm fuera del repo) |
+| IA | Gemini (tier gratuito de Google AI Studio) - extraccion + embeddings + chat |
 | OAuth | Google OAuth 2.0 (Drive + Gmail) |
-| Tipo cambio | API publica del Ministerio de Hacienda CR (republica BCCR) |
+| Tipo cambio | API publica del Ministerio de Hacienda CR |
+| Logs | pino + pino-pretty |
+| Tests | vitest + supertest (backend), vitest + @testing-library (frontend) |
 
-**No se utiliza** PHP, phpMyAdmin, Docker/Podman/contenedores, ningun servicio IA distinto de Gemini, ningun motor OCR distinto de Tesseract local. Excel es solo reporte/exportacion; MySQL es la fuente unica de verdad.
+**No usamos** PHP, phpMyAdmin, Docker, otras IAs distintas de Gemini, ni motores OCR distintos a Tesseract. Excel es solo reporte; MySQL es la fuente unica de verdad.
 
-## Estructura del repositorio
+## Estructura
 
 ```
 proyecto_contabilidad/
-├── README.md                  (este archivo)
-├── ROADMAP.md                 lista de pendientes para futuras sesiones
-├── SETUP.md                   guia detallada de instalacion paso a paso
-├── backend/
-│   ├── README.md              guia tecnica backend
-│   ├── package.json
-│   ├── templates/             machotes Excel (Reintegro.xlsx)
-│   ├── storage/               uploads/ ocr/ processed/ errors/ temp/  (git-ignored)
-│   ├── .env.example           plantilla de variables (.env real esta en .gitignore)
-│   └── src/
-│       ├── server.js
-│       ├── app.js
-│       ├── config/env.js
-│       ├── db/
-│       │   ├── pool.js
-│       │   ├── migrate.js     'npm run db:migrate'
-│       │   ├── seed.js        'npm run db:seed'
-│       │   └── migrations/    *.sql aplicados en orden
-│       ├── middleware/
-│       ├── controllers/
-│       ├── routes/
-│       └── services/
-├── frontend/
-│   ├── README.md              guia tecnica frontend
-│   ├── package.json
-│   ├── vite.config.js
-│   ├── tailwind.config.js
-│   ├── .env.example
-│   └── src/
-│       ├── main.jsx, App.jsx, index.css
-│       ├── services/api.js    cliente axios + JWT interceptor
-│       ├── auth/              AuthContext + ProtectedRoute
-│       ├── layouts/           AppLayout con sidebar
-│       └── pages/             Login, Dashboard, Documents, Detail, Users, GoogleAdmin, ...
+├── README.md                  este archivo
+├── INSTALACION.md             guia primera vez
+├── INICIO-RAPIDO.md           guia retomar sesion
+├── TAREAS-PENDIENTES.md       roadmap + items completados
+├── backend/                   API Express + MySQL + servicios
+├── frontend/                  React + Vite + Tailwind (UI)
 └── n8n-workflows/             JSON importables: DriveIngest, GmailIngest, TipoCambioBCCR
 ```
 
-## Acceso para un usuario final
+## Secciones de la UI (http://localhost:5173)
 
-1. El administrador del sistema le entrega correo y contrasena temporal.
-2. Visite **http://localhost:5173** (en entorno local) o la URL desplegada.
-3. Inicie sesion. La aplicacion no permite registro publico: solo un admin puede crearle cuenta.
-4. Segun su rol vera:
-   - **USUARIO**: dashboard, gestion documental (subir y consultar), consulta RAG, chatbot, trazabilidad.
-   - **ADMIN**: ademas registrar/gestionar usuarios, conexion Google, eliminar documentos, reiniciar Reintegro.
-5. El sistema solo permite **3 administradores simultaneos**.
+Para todos los usuarios autenticados:
 
-## Como poner en marcha en un equipo nuevo (desarrollador)
-
-Lea [`SETUP.md`](SETUP.md) para el paso a paso completo. Resumen:
-
-1. Instalar **Node.js 20+** y **MySQL Server** nativo Windows + MySQL Workbench.
-2. Clonar el repositorio.
-3. Backend:
-   ```powershell
-   cd backend
-   npm install
-   cp .env.example .env          # editar credenciales
-   ```
-4. En MySQL Workbench, ejecutar `backend/src/db/migrations/000_create_user_and_db.sql` como root (una sola vez) para crear la base y el usuario.
-5. Aplicar migraciones y seed:
-   ```powershell
-   npm run db:migrate
-   npm run db:seed
-   npm run dev                   # backend en :3000
-   ```
-6. Frontend:
-   ```powershell
-   cd ../frontend
-   npm install
-   cp .env.example .env
-   npm run dev                   # frontend en :5173
-   ```
-7. n8n (instalado fuera de la carpeta del proyecto para evitar conflictos con OneDrive):
-   ```powershell
-   mkdir C:\n8n-runtime
-   cd C:\n8n-runtime
-   npm init -y
-   npm install n8n --legacy-peer-deps
-   .\node_modules\.bin\n8n start  # :5678
-   ```
-8. Importar workflows desde `n8n-workflows/` y activarlos.
-
-## Credenciales necesarias
-
-Todas se obtienen gratis. Detalles en [`SETUP.md`](SETUP.md):
-
-| Credencial | Fuente | Para que |
+| Seccion | Ruta | Que hace |
 |---|---|---|
-| GEMINI_API_KEY | https://aistudio.google.com/app/apikey | Extraccion IA |
-| GOOGLE_CLIENT_ID / SECRET | https://console.cloud.google.com (OAuth 2.0 Web client) | Drive + Gmail |
-| N8N_INGEST_TOKEN | Generado al instalar (cualquier string aleatorio largo) | Auth n8n -> Backend |
-| JWT_SECRET | Generado al instalar (cualquier string aleatorio largo) | Sesiones JWT |
-| Hacienda CR API | Publica, sin token | Tipo de cambio CRC/USD |
+| **Panel principal** | `/` | Vista rapida: contadores por estado, IVA por tarifa, top proveedores, evolucion mensual, tipo de cambio del dia. |
+| **Gestion documental** | `/documents` | Lista de facturas, filtros, subir manualmente, abrir el detalle de cada una. |
+| **Consulta inteligente** | `/rag` | Preguntar al sistema en espanol sobre las facturas; la IA responde citando las facturas usadas. |
+| **Trazabilidad** | `/traceability` | Vista global del estado de cada factura en el pipeline (lectura -> IA -> validacion -> Excel). |
+| **Mi cuenta** | `/profile` | Tus datos y cambio de password. |
 
-**Nada de esto se guarda en git**. El `.env` real esta en `.gitignore`.
+Solo para ADMIN:
 
-## Reglas inviolables (Plan Maestro v2.1)
+| Seccion | Ruta | Que hace |
+|---|---|---|
+| Registrar usuario | `/admin/users/new` | Crear cuentas para el equipo (USUARIO o ADMIN). |
+| Gestionar usuarios | `/admin/users` | Editar nombre, rol y estado; maximo 3 ADMIN activos. |
+| Conexion Google | `/admin/google` | Conectar Drive + Gmail, tipo de cambio, mantenimiento de archivos. |
 
-### Extraccion IA
+> El **Chatbot contable** (`/chatbot`) esta oculto del menu hasta que el modulo se implemente. Ver [`TAREAS-PENDIENTES.md`](TAREAS-PENDIENTES.md).
 
-- **Solo extrae lo visible**. Prohibido inventar, inferir, estimar, completar, aproximar o corregir.
-- Campos no presentes en el documento -> `null`.
-- Calcular aritmeticamente sobre datos visibles (ej. `monto_iva = base x tarifa/100`) **si esta permitido** porque es matematica determinista, no inferencia.
+## Reglas inviolables
 
-### OCR
-
-- No corrige, interpreta, resume ni reordena. Preserva texto, saltos, orden y estructura tal cual.
-- El resultado se guarda en `raw_ocr` (inmutable).
-- Gemini **nunca** se usa como motor OCR.
-
-### Persistencia
-
-- **MySQL es la fuente unica**. Excel es solo reporte/exportacion.
-- El machote Excel debe existir; si no existe, el proceso se detiene.
-- Hash documental SHA256 previene duplicados entre Drive y Gmail.
-- Conversion monetaria nunca recalcula historicos (snapshot inmutable por factura).
-
-### Trazabilidad
-
-- Cada etapa registra inicio, fin, duracion y resultado en `processing_trace`.
-- Toda edicion manual queda en `manual_edits` sin sobreescribir el original.
-- Esta prohibido eliminar historial; los endpoints de "eliminar documento" actuan en cascada sobre los registros del documento eliminado, pero la auditoria de Reintegros anteriores se preserva.
-
-### Gmail
-
-- Solo procesa correos UNREAD con adjuntos.
-- Marca como leido **unicamente** si todos los adjuntos del correo se procesaron sin error.
-- Si algun adjunto falla, el correo queda UNREAD para reintentarse en el siguiente poll.
-
-### Drive
-
-- Estructura obligatoria: `/DocScanFinanceCR/{Facturas,Procesadas,Errores,PlantillasExcel,OCR,Temporal}`.
-- Idempotente: si existe se reutiliza; si falta parcialmente se completa; si no existe se crea.
-- Tras procesar, el archivo se mueve a `/Procesadas` o `/Errores`.
-
-### n8n
-
-- **Solo dispara**. Nunca toca MySQL, OCR, IA ni Excel directamente.
-- Auth por header `X-N8N-Token`.
-- Workflows incluidos: `DriveIngest` (40 s), `GmailIngest` (40 s), `TipoCambioBCCR` (08:00 diario).
-
-### Usuarios y autenticacion
-
-- JWT obligatorio para todas las rutas excepto `/api/auth/login` y el callback OAuth de Google.
-- Maximo 3 administradores simultaneos.
-- Un admin no puede degradarse a si mismo ni desactivar su propia cuenta.
-- No se puede degradar al ultimo administrador activo.
-
-## Restricciones formales del proyecto (extracto)
-
-Esta prohibido:
-
-- Usar Excel como fuente principal de datos.
-- Modificar el contenido de `raw_ocr` despues de persistido.
-- Sobreescribir valores originales en `invoices` o `invoice_lines` (los cambios van a `manual_edits`).
-- Inferir datos de IA, recalcular historicos, releer correos ya procesados.
-- Crear plantillas Excel alternativas (debe usarse el machote existente).
-- Eliminar registros de auditoria.
-- Usar PHP, phpMyAdmin, Docker o cualquier IA distinta de Gemini.
-- Permitir SQL libre desde el chatbot (cuando se implemente: solo SELECT parametrizado con whitelist de intenciones).
+- **IA solo extrae lo visible.** Prohibido inventar, inferir, estimar, completar, aproximar o corregir. Campos no presentes = `null`. Edicion humana queda en `manual_edits`.
+- **OCR no se modifica** despues de persistido (`raw_ocr` es inmutable).
+- **MySQL es la fuente unica.** Excel es solo reporte y debe regenerarse si la fuente cambia.
+- **Dedup por hash + numero de factura.** Si re-escaneas la misma factura, queda como `DUPLICATE`. Si el original fue eliminado, el rescan se procesa normalmente.
+- **n8n solo orquesta** (cron + HTTP). Nunca toca MySQL, OCR, IA ni Excel directamente.
+- **Conversion monetaria no se recalcula** sobre facturas viejas (snapshot inmutable).
+- **Maximo 3 administradores** activos al mismo tiempo.
+- **Validaciones aritmeticas no corrigen.** Si subtotal+IVA != total, el sistema marca la invoice como `REVISION` pero deja los valores extraidos intactos.
 
 ## Comandos rapidos
 
 ```powershell
 # Backend
-cd backend
-npm run dev          # nodemon hot reload, puerto 3000
-npm run db:migrate   # aplica .sql en migrations/
-npm run db:seed      # crea usuario ADMIN inicial
+cd backend; npm run dev            # puerto 3000
+cd backend; npm test               # corre 32 tests
 
 # Frontend
-cd frontend
-npm run dev          # Vite, puerto 5173
-npm run build        # produccion
+cd frontend; npm run dev           # puerto 5173
+cd frontend; npm test              # 4 tests UI
 
-# n8n (instalado en C:\n8n-runtime para evitar OneDrive)
-cd C:\n8n-runtime
-.\node_modules\.bin\n8n start   # puerto 5678
+# n8n (instalado en C:\n8n-runtime - fuera del repo)
+cd C:\n8n-runtime; .\node_modules\.bin\n8n start   # puerto 5678
 ```
 
 ## Salud del sistema
 
-`GET /api/health` devuelve estado de cada dependencia:
+`GET http://localhost:3000/api/health` devuelve el estado:
 
 ```json
 {
@@ -238,10 +130,6 @@ cd C:\n8n-runtime
 }
 ```
 
-## Documentos relacionados
+## Seguridad: nada de secretos en el repo
 
-- [`SETUP.md`](SETUP.md) - instalacion paso a paso de cero
-- [`ROADMAP.md`](ROADMAP.md) - tareas pendientes y futuras
-- [`backend/README.md`](backend/README.md) - detalle tecnico del backend
-- [`frontend/README.md`](frontend/README.md) - detalle tecnico del frontend
-- [`n8n-workflows/README.md`](n8n-workflows/README.md) - como importar y activar los workflows
+El `.env` real esta en `.gitignore`. Si abris el repo y no ves credenciales, **es asi a proposito**. Tenes que crearlas siguiendo [`INSTALACION.md`](INSTALACION.md). Si necesitas rotarlas en algun momento, ver la seccion "Hardening" de [`TAREAS-PENDIENTES.md`](TAREAS-PENDIENTES.md).
