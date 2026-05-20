@@ -9,6 +9,7 @@ import UsersAdminPage from './pages/UsersAdminPage.jsx';
 import RegisterUserPage from './pages/RegisterUserPage.jsx';
 import GoogleAdminPage from './pages/GoogleAdminPage.jsx';
 import TraceabilityPage from './pages/TraceabilityPage.jsx';
+import ProfilePage from './pages/ProfilePage.jsx';
 import Placeholder from './pages/Placeholder.jsx';
 
 export default function App() {
@@ -29,6 +30,7 @@ export default function App() {
         <Route path="rag" element={<Placeholder title="Consulta RAG" description="Busqueda semantica sobre OCR y XML." />} />
         <Route path="chatbot" element={<Placeholder title="Chatbot contable" description="Asistente conversacional NLP -> SQL parametrizado." />} />
         <Route path="traceability" element={<TraceabilityPage />} />
+        <Route path="profile" element={<ProfilePage />} />
         <Route
           path="admin/users"
           element={

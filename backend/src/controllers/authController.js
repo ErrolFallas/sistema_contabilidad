@@ -52,4 +52,48 @@ async function me(req, res, next) {
   }
 }
 
-module.exports = { login, me };
+const changePasswordSchema = z.object({
+  current_password: z.string().min(1, 'Password actual obligatorio'),
+  new_password: z.string().min(8, 'Minimo 8 caracteres').max(200),
+});
+
+async function changePassword(req, res, next) {
+  try {
+    const parsed = changePasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'BadRequest', issues: parsed.error.flatten() });
+    }
+    const { current_password, new_password } = parsed.data;
+    if (current_password === new_password) {
+      return res.status(400).json({
+        error: 'BadRequest',
+        message: 'La password nueva debe ser distinta de la actual',
+      });
+    }
+
+    const [rows] = await pool.query(
+      'SELECT id, password_hash, activo FROM users WHERE id = ? LIMIT 1',
+      [req.user.sub]
+    );
+    const user = rows[0];
+    if (!user || !user.activo) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const ok = await bcrypt.compare(current_password, user.password_hash);
+    if (!ok) {
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Password actual incorrecto',
+      });
+    }
+    const newHash = await bcrypt.hash(new_password, 10);
+    await pool.query('UPDATE users SET password_hash = ? WHERE id = ?', [newHash, user.id]);
+
+    req.log.info({ user_id: user.id }, 'user changed own password');
+    res.json({ ok: true });
+  } catch (e) {
+    next(e);
+  }
+}
+
+module.exports = { login, me, changePassword };

@@ -49,6 +49,25 @@ export default function GoogleAdminPage() {
     onError: (err) => alert(err?.response?.data?.message || err.message),
   });
 
+  const { data: orphans, refetch: refetchOrphans, isFetching: orphansLoading } = useQuery({
+    queryKey: ['storage-orphans'],
+    queryFn: () => api.get('/api/admin/storage/orphans').then((r) => r.data),
+    enabled: false,
+  });
+
+  const cleanupMutation = useMutation({
+    mutationFn: () => api.post('/api/admin/storage/cleanup', null, { timeout: 60000 }).then((r) => r.data),
+    onSuccess: (data) => {
+      alert(
+        `Limpieza completada en ${data.result.duration_ms} ms.\n\n` +
+        `Temp: ${data.result.temp.deleted} borrados / ${data.result.temp.scanned} escaneados.\n` +
+        `Uploads: ${data.result.uploads.deleted} borrados, ${data.result.uploads.kept_referenced} en uso, ${data.result.uploads.kept_recent} aun no caducan.`
+      );
+      refetchOrphans();
+    },
+    onError: (err) => alert(err?.response?.data?.message || err.message),
+  });
+
   const { data: rates } = useQuery({
     queryKey: ['currency', 'list'],
     queryFn: () => api.get('/api/integrations/currency?limit=10').then((r) => r.data),
@@ -224,6 +243,108 @@ export default function GoogleAdminPage() {
           </table>
         ) : (
           <p className="text-sm text-slate-500">Sin tipos de cambio aun. Click "Consultar tipo cambio" para iniciar.</p>
+        )}
+      </div>
+
+      <div className="bg-white shadow rounded p-4">
+        <div className="flex justify-between items-center mb-2">
+          <h2 className="text-sm font-semibold text-slate-700">Mantenimiento de almacenamiento</h2>
+          <div className="flex gap-2">
+            <button
+              onClick={() => refetchOrphans()}
+              disabled={orphansLoading}
+              className="text-xs px-3 py-1.5 rounded border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            >
+              {orphansLoading ? 'Escaneando...' : 'Escanear huerfanos'}
+            </button>
+            <button
+              onClick={() => { if (confirm('Borrar archivos temporales >7 dias y uploads huerfanos >30 dias?')) cleanupMutation.mutate(); }}
+              disabled={cleanupMutation.isPending}
+              className="text-xs px-3 py-1.5 rounded bg-amber-600 hover:bg-amber-700 text-white disabled:opacity-60"
+            >
+              {cleanupMutation.isPending ? 'Limpiando...' : 'Ejecutar limpieza'}
+            </button>
+          </div>
+        </div>
+        <p className="text-xs text-slate-500 mb-3">
+          La limpieza tambien corre automaticamente todos los dias a las 03:15 (hora local del servidor).
+          Solo se borran archivos: la base de datos no se toca.
+        </p>
+
+        {orphans ? (
+          <div className="space-y-3">
+            <div className="grid grid-cols-3 gap-3 text-sm">
+              <div className="bg-slate-50 rounded p-3">
+                <div className="text-xs text-slate-500 uppercase">Documentos en BD</div>
+                <div className="text-lg font-semibold text-slate-800">{orphans.scanned_documents}</div>
+              </div>
+              <div className="bg-slate-50 rounded p-3">
+                <div className="text-xs text-slate-500 uppercase">Archivos en uploads/</div>
+                <div className="text-lg font-semibold text-slate-800">{orphans.scanned_files}</div>
+              </div>
+              <div className={`rounded p-3 ${orphans.orphan_files.count > 0 ? 'bg-amber-50' : 'bg-green-50'}`}>
+                <div className="text-xs text-slate-500 uppercase">Huerfanos detectados</div>
+                <div className={`text-lg font-semibold ${orphans.orphan_files.count > 0 ? 'text-amber-700' : 'text-green-700'}`}>
+                  {orphans.orphan_files.count}
+                  <span className="text-xs font-normal text-slate-500 ml-2">
+                    ({(orphans.orphan_files.total_size_bytes / 1024).toFixed(1)} KB)
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {orphans.missing_files.count > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded p-3">
+                <div className="text-xs font-semibold text-red-700 uppercase mb-2">
+                  Documentos cuyo archivo fisico no existe ({orphans.missing_files.count})
+                </div>
+                <ul className="text-xs space-y-1">
+                  {orphans.missing_files.items.map((m) => (
+                    <li key={m.document_id} className="text-red-700">
+                      #{m.document_id} - {m.original_filename} - <span className="font-mono">{m.storage_path}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {orphans.orphan_files.count > 0 && (
+              <div>
+                <div className="text-xs font-semibold text-slate-600 uppercase mb-2">
+                  Archivos sin documento asociado
+                </div>
+                <div className="max-h-64 overflow-auto bg-slate-50 rounded p-2">
+                  <table className="w-full text-xs">
+                    <thead className="text-slate-500 sticky top-0 bg-slate-50">
+                      <tr>
+                        <th className="text-left py-1">Archivo</th>
+                        <th className="text-right py-1">Tamano</th>
+                        <th className="text-right py-1">Edad</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {orphans.orphan_files.items.map((f, i) => (
+                        <tr key={i}>
+                          <td className="py-1 font-mono">{f.file}</td>
+                          <td className="py-1 text-right">{f.size_bytes ? `${(f.size_bytes / 1024).toFixed(1)} KB` : '-'}</td>
+                          <td className="py-1 text-right">{f.age_days != null ? `${f.age_days} d` : '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-xs text-slate-500 mt-2">
+                  Los archivos &gt; 30 dias se borran solos en el proximo cron. Para forzar ahora use "Ejecutar limpieza".
+                </p>
+              </div>
+            )}
+
+            {orphans.missing_files.count === 0 && orphans.orphan_files.count === 0 && (
+              <p className="text-sm text-green-700">Todo en orden. No hay huerfanos ni archivos faltantes.</p>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-slate-500">Click "Escanear huerfanos" para revisar el estado del almacenamiento.</p>
         )}
       </div>
     </div>

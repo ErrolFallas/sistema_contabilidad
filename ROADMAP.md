@@ -28,13 +28,15 @@ Lista viva de lo que falta y de mejoras conocidas. Marcar con `[x]` al completar
   - Hacienda solo expone USD. Buscar fuente para EUR (BCCR SOAP requiere token).
   - Por ahora `moneda = EUR` queda sin conversion.
 
-- [ ] **(P2, S)** Reintentos automaticos de documentos en ERROR
+- [x] **(P2, S)** Reintentos automaticos de documentos en ERROR
   - Workflow n8n `ReprocesoErrores` (mencionado en plan 14.4).
   - Endpoint `POST /api/documents/:id/reprocess`.
   - Solo reintenta si error es recuperable (timeout, network, no estructural).
+  - Implementado: `POST /api/documents/:id/reprocess` (ADMIN). Limpia raw_ocr / ai_extractions / processing_trace / excel_mapping / invoices / invoice_lines del documento, resetea documents row a PROCESSING y vuelve a correr el pipeline. Conserva id y hash. Flag `reprocessExistingDocId` en processFile salta el hash check + INSERT. UI: boton "Reprocesar" en DocumentDetailPage para ADMIN. El workflow n8n automatico queda pendiente como sub-item futuro.
 
-- [ ] **(P2, S)** Limpieza automatica de `storage/temp` y archivos antiguos en `storage/uploads`
+- [x] **(P2, S)** Limpieza automatica de `storage/temp` y archivos antiguos en `storage/uploads`
   - Cron diario que borra archivos > 30 dias.
+  - Implementado: `storageCleanupService.js` con `cleanOldTempFiles` (default 7 dias) y `cleanOrphanedUploads` (default 30 dias, solo borra archivos NO referenciados por documents.storage_path activos). Cron `15 3 * * *` registrado en `server.js` con `node-cron`. Endpoint manual `POST /api/admin/storage/cleanup` (ADMIN). UI en GoogleAdminPage seccion "Mantenimiento de almacenamiento".
 
 - [x] **(P1, S)** Dedup por numero de factura + proveedor (post-extraccion)
   - Antes solo se deduplicaba por SHA del binario. Si el contador re-escaneaba en mayor resolucion, el binario diferia y la misma factura entraba dos veces. Ahora despues de Gemini, si `numero_factura + proveedor_cedula` (o `proveedor_nombre` normalizado como fallback) ya existe en un documento NO eliminado y NO en ERROR/DUPLICATE, el nuevo se marca como DUPLICATE y NO se inserta invoice ni se escribe Excel. Si el documento original se elimina desde la UI, su invoice desaparece por CASCADE y el archivo puede volver a procesarse normalmente.
@@ -87,19 +89,21 @@ Lista viva de lo que falta y de mejoras conocidas. Marcar con `[x]` al completar
   - Mostrar historial de cambios.
   - Endpoints: `PATCH /api/invoices/:id`, `PATCH /api/invoice-lines/:id`, `GET /api/documents/:id/edits`. Whitelist de campos editables. `original_value` se guarda como el valor que estaba en la fila inmediatamente antes (primera edicion = valor IA). Razon obligatoria. Cambios se aplican en transaccion con su audit-line. Excel NO se actualiza automaticamente; usar "Nuevo Reintegro" para regenerarlo si se desea reflejar la edicion alli.
 
-- [ ] **(P2, S)** Filtros avanzados en `Gestion documental`
+- [x] **(P2, S)** Filtros avanzados en `Gestion documental`
   - Por source_type (Drive / Gmail / Manual).
   - Por status (con multi-select).
   - Por rango de fechas.
   - Busqueda por proveedor o numero factura.
+  - Implementado: backend acepta `status`, `source` (multi via comma), `from`, `to`, `search` (LIKE sobre original_filename / proveedor_nombre / numero_factura). Frontend: barra con ChipMulti reusable + date pickers + search box. Refresca con react-query cada 5s usando queryKey dinamico segun filtros activos.
 
 - [ ] **(P2, S)** Vista responsive mobile
   - Sidebar colapsable en mobile.
   - Tablas con scroll mas amigables.
 
-- [ ] **(P2, M)** Cambiar password propio
+- [x] **(P2, M)** Cambiar password propio
   - Modal en perfil o pagina dedicada.
   - Pide password actual + nueva 2 veces.
+  - Implementado como pagina `/profile`. Endpoint `PATCH /api/auth/password` con zod schema (current obligatorio, new min 8 chars, rechaza si new==current). Validacion con bcrypt del current antes de hashear el nuevo. Frontend con react-hook-form + zodResolver. Sesion actual no se invalida tras el cambio (el JWT vigente sigue valido hasta su expiracion natural). Link en el footer del sidebar (nombre del usuario).
 
 ---
 
@@ -184,9 +188,10 @@ Lista viva de lo que falta y de mejoras conocidas. Marcar con `[x]` al completar
   - Los datos quedan correctos pero Excel muestra un warning cosmetico al abrir.
   - Opciones: aceptar warning, simplificar machote, o reemplazar ExcelJS con xlsx-populate solo para esta operacion.
 
-- [ ] **(P2, S)** Limpieza de archivos huerfanos
+- [x] **(P2, S)** Limpieza de archivos huerfanos
   - Si un documento se elimina pero su archivo fisico ya fue movido, queda referencia rota.
   - Detector que compara `documents.storage_path` con files en disco.
+  - Implementado: `detectOrphans()` en `storageCleanupService.js`. Endpoint `GET /api/admin/storage/orphans` (ADMIN) devuelve 2 listas: (1) documents cuya storage_path no existe en disco, (2) archivos en storage/uploads sin referencia. UI: tabla con tamano y edad en GoogleAdminPage. Solo reporta, no borra (la limpieza se hace via el endpoint cleanup).
 
 - [ ] **(P2, S)** Documentar swagger / OpenAPI
   - Generar spec automatica del backend (zod-to-openapi o similar).

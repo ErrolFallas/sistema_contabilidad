@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import api from '../services/api.js';
@@ -14,9 +14,38 @@ const STATUS_COLORS = {
   ERROR: 'bg-red-100 text-red-800',
 };
 
+const FILTER_STATUSES = ['COMPLETED', 'PROCESSING', 'PERSISTED', 'REVIEW', 'DUPLICATE', 'ERROR', 'PENDING'];
+const FILTER_SOURCES = ['DRIVE', 'GMAIL', 'MANUAL'];
+
 function StatusBadge({ status }) {
   const cls = STATUS_COLORS[status] || 'bg-slate-100 text-slate-700';
   return <span className={`px-2 py-0.5 rounded text-xs font-medium ${cls}`}>{status}</span>;
+}
+
+function toggleInList(list, value) {
+  return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
+}
+
+function ChipMulti({ options, value, onChange }) {
+  return (
+    <div className="flex flex-wrap gap-1">
+      {options.map((opt) => {
+        const active = value.includes(opt);
+        return (
+          <button
+            key={opt}
+            type="button"
+            onClick={() => onChange(toggleInList(value, opt))}
+            className={`text-xs px-2 py-1 rounded border ${
+              active ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+            }`}
+          >
+            {opt}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 export default function DocumentsPage() {
@@ -29,11 +58,38 @@ export default function DocumentsPage() {
   const [uploadError, setUploadError] = useState(null);
   const [lastResult, setLastResult] = useState(null);
 
+  const [filterStatuses, setFilterStatuses] = useState([]);
+  const [filterSources, setFilterSources] = useState([]);
+  const [filterFrom, setFilterFrom] = useState('');
+  const [filterTo, setFilterTo] = useState('');
+  const [filterSearch, setFilterSearch] = useState('');
+
+  const filterQuery = useMemo(() => {
+    const p = new URLSearchParams();
+    p.set('limit', '50');
+    if (filterStatuses.length) p.set('status', filterStatuses.join(','));
+    if (filterSources.length) p.set('source', filterSources.join(','));
+    if (filterFrom) p.set('from', filterFrom);
+    if (filterTo) p.set('to', filterTo);
+    if (filterSearch.trim()) p.set('search', filterSearch.trim());
+    return p.toString();
+  }, [filterStatuses, filterSources, filterFrom, filterTo, filterSearch]);
+
+  const anyFilter = filterStatuses.length || filterSources.length || filterFrom || filterTo || filterSearch.trim();
+
   const { data, isLoading } = useQuery({
-    queryKey: ['documents', 'list'],
-    queryFn: () => api.get('/api/documents?limit=50').then((r) => r.data),
+    queryKey: ['documents', 'list', filterQuery],
+    queryFn: () => api.get(`/api/documents?${filterQuery}`).then((r) => r.data),
     refetchInterval: 5000,
   });
+
+  function clearFilters() {
+    setFilterStatuses([]);
+    setFilterSources([]);
+    setFilterFrom('');
+    setFilterTo('');
+    setFilterSearch('');
+  }
 
   const mutation = useMutation({
     mutationFn: async (file) => {
@@ -229,10 +285,61 @@ export default function DocumentsPage() {
         </div>
       )}
 
-      <div className="mt-6 bg-white rounded-lg shadow">
+      <div className="mt-6 bg-white rounded-lg shadow p-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div>
+            <div className="text-xs font-semibold text-slate-500 uppercase mb-1">Estado</div>
+            <ChipMulti options={FILTER_STATUSES} value={filterStatuses} onChange={setFilterStatuses} />
+          </div>
+          <div>
+            <div className="text-xs font-semibold text-slate-500 uppercase mb-1">Origen</div>
+            <ChipMulti options={FILTER_SOURCES} value={filterSources} onChange={setFilterSources} />
+          </div>
+        </div>
+        <div className="flex flex-wrap items-end gap-3 mt-3">
+          <div>
+            <div className="text-xs font-semibold text-slate-500 uppercase mb-1">Desde</div>
+            <input
+              type="date"
+              value={filterFrom}
+              onChange={(e) => setFilterFrom(e.target.value)}
+              className="border rounded px-2 py-1 text-sm"
+            />
+          </div>
+          <div>
+            <div className="text-xs font-semibold text-slate-500 uppercase mb-1">Hasta</div>
+            <input
+              type="date"
+              value={filterTo}
+              onChange={(e) => setFilterTo(e.target.value)}
+              className="border rounded px-2 py-1 text-sm"
+            />
+          </div>
+          <div className="flex-1 min-w-[14rem]">
+            <div className="text-xs font-semibold text-slate-500 uppercase mb-1">Buscar (archivo / proveedor / numero factura)</div>
+            <input
+              type="text"
+              value={filterSearch}
+              onChange={(e) => setFilterSearch(e.target.value)}
+              placeholder="Ej: Pacific, F-001, caja_chica.pdf"
+              className="border rounded px-2 py-1 text-sm w-full"
+            />
+          </div>
+          {anyFilter && (
+            <button
+              onClick={clearFilters}
+              className="text-xs px-3 py-1 rounded border text-slate-700 hover:bg-slate-50"
+            >
+              Limpiar filtros
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-4 bg-white rounded-lg shadow">
         <div className="px-4 py-2 border-b flex justify-between items-center">
           <span className="text-sm font-medium text-slate-700">
-            Documentos ({data?.total || 0})
+            Documentos ({data?.total || 0}{anyFilter ? ' filtrados' : ''})
           </span>
           <span className="text-xs text-slate-400">
             Mas recientes primero. El boton "Eliminar" queda fijo a la derecha.

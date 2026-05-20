@@ -35,17 +35,47 @@ async function upload(req, res, next) {
   }
 }
 
+const STATUS_VALUES = ['PENDING','PROCESSING','OCR_DONE','EXTRACTED','VALIDATED','PERSISTED','EXCEL_DONE','COMPLETED','DUPLICATE','REVIEW','ERROR'];
+const SOURCE_VALUES = ['DRIVE','GMAIL','MANUAL'];
+
+function parseFilterList(value, allowed) {
+  if (!value) return [];
+  return String(value).split(',').map((s) => s.trim()).filter((v) => allowed.includes(v));
+}
+
+function parseFilterDate(value) {
+  if (!value) return null;
+  const s = String(value);
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
+}
+
 async function list(req, res, next) {
   try {
     const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
     const offset = parseInt(req.query.offset, 10) || 0;
-    const status = req.query.status;
-    const source = req.query.source;
+    const statuses = parseFilterList(req.query.status, STATUS_VALUES);
+    const sources = parseFilterList(req.query.source, SOURCE_VALUES);
+    const from = parseFilterDate(req.query.from);
+    const to = parseFilterDate(req.query.to);
+    const search = (req.query.search || '').toString().trim().slice(0, 100);
 
     const wheres = [];
     const args = [];
-    if (status) { wheres.push('d.status = ?'); args.push(status); }
-    if (source) { wheres.push('d.source_type = ?'); args.push(source); }
+    if (statuses.length) {
+      wheres.push(`d.status IN (${statuses.map(() => '?').join(',')})`);
+      args.push(...statuses);
+    }
+    if (sources.length) {
+      wheres.push(`d.source_type IN (${sources.map(() => '?').join(',')})`);
+      args.push(...sources);
+    }
+    if (from) { wheres.push('d.received_at >= ?'); args.push(`${from} 00:00:00`); }
+    if (to)   { wheres.push('d.received_at <= ?'); args.push(`${to} 23:59:59`); }
+    if (search) {
+      wheres.push('(d.original_filename LIKE ? OR i.proveedor_nombre LIKE ? OR i.numero_factura LIKE ?)');
+      const term = `%${search}%`;
+      args.push(term, term, term);
+    }
     const where = wheres.length ? `WHERE ${wheres.join(' AND ')}` : '';
 
     const [items] = await pool.query(
@@ -61,7 +91,10 @@ async function list(req, res, next) {
       [...args, limit, offset]
     );
     const [[count]] = await pool.query(
-      `SELECT COUNT(*) AS total FROM documents d ${where}`,
+      `SELECT COUNT(DISTINCT d.id) AS total
+         FROM documents d
+         LEFT JOIN invoices i ON i.document_id = d.id
+         ${where}`,
       args
     );
     res.json({ items, total: count.total, limit, offset });
@@ -159,6 +192,79 @@ async function downloadReintegro(req, res, next) {
  * se borran del archivo (se eliminan de excel_mapping, pero el .xlsx
  * mantiene los datos hasta que se reinicie el Reintegro).
  */
+/**
+ * Reprocesa un documento existente: limpia raw_ocr, ai_extractions,
+ * processing_trace, excel_mapping, invoices, invoice_lines del documento,
+ * resetea documents row a PROCESSING y vuelve a correr el pipeline contra
+ * el mismo storage_path. El document_hash queda igual; se preserva el id.
+ *
+ * Util para:
+ *  - Errores transitorios (timeout de Gemini, red).
+ *  - Cambios en el prompt o pipeline (probar el archivo con la nueva logica).
+ *  - REVIEW dudoso (Gemini puede clasificar distinto al re-evaluar).
+ *
+ * Si la fila Excel del documento existe en excel_mapping, se elimina la
+ * referencia. La fila fisica del Excel NO se borra (puede quedar duplicada
+ * tras reprocesar). Para limpieza completa del Excel: "Nuevo Reintegro".
+ */
+async function reprocess(req, res, next) {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ error: 'BadRequest', message: 'Id invalido' });
+    }
+    const [rows] = await pool.query(
+      'SELECT id, storage_path, original_filename, mime_type, file_size, source_type FROM documents WHERE id = ? LIMIT 1',
+      [id]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'NotFound', message: `Documento #${id} no encontrado` });
+    const doc = rows[0];
+    if (!doc.storage_path || !fs.existsSync(doc.storage_path)) {
+      return res.status(412).json({
+        error: 'PreconditionFailed',
+        message: 'El archivo fisico no existe en disco. No se puede reprocesar; vuelva a subirlo.',
+      });
+    }
+
+    // Limpieza de rastros previos. ON DELETE CASCADE no se dispara porque NO
+    // borramos documents (mantenemos el id). Limpiamos cada tabla hija manual.
+    await pool.query('DELETE FROM excel_mapping WHERE document_id = ?', [id]);
+    await pool.query('DELETE FROM invoice_lines WHERE invoice_id IN (SELECT id FROM invoices WHERE document_id = ?)', [id]);
+    await pool.query('DELETE FROM invoices WHERE document_id = ?', [id]);
+    await pool.query('DELETE FROM ai_extractions WHERE document_id = ?', [id]);
+    await pool.query('DELETE FROM raw_ocr WHERE document_id = ?', [id]);
+    await pool.query('DELETE FROM raw_xml WHERE document_id = ?', [id]);
+    await pool.query('DELETE FROM processing_trace WHERE document_id = ?', [id]);
+
+    await pool.query(
+      `UPDATE documents
+          SET status = 'PROCESSING',
+              error_message = NULL,
+              completed_at = NULL,
+              duplicate_document_id = NULL,
+              doc_kind = 'UNKNOWN'
+        WHERE id = ?`,
+      [id]
+    );
+
+    req.log.info({ document_id: id, user_id: req.user.sub }, 'document reprocess requested');
+
+    const out = await processFile({
+      filePath: doc.storage_path,
+      originalFilename: doc.original_filename,
+      mimeType: doc.mime_type,
+      fileSize: doc.file_size,
+      source_type: doc.source_type,
+      uploaded_by_user_id: req.user.sub,
+      reprocessExistingDocId: id,
+    });
+
+    res.json({ reprocessed: true, ...out });
+  } catch (e) {
+    next(e);
+  }
+}
+
 async function remove(req, res, next) {
   try {
     const id = parseInt(req.params.id, 10);
@@ -252,4 +358,4 @@ async function resetReintegro(req, res, next) {
   }
 }
 
-module.exports = { upload, list, detail, trace, downloadReintegro, remove, resetReintegro, bulkRemove };
+module.exports = { upload, list, detail, trace, downloadReintegro, remove, resetReintegro, bulkRemove, reprocess };

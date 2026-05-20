@@ -1,5 +1,5 @@
 const express = require('express');
-const { login, me } = require('../controllers/authController');
+const { login, me, changePassword } = require('../controllers/authController');
 const googleAuth = require('../controllers/googleAuthController');
 const { authRequired, requireRole } = require('../middleware/auth');
 
@@ -7,6 +7,7 @@ const router = express.Router();
 
 router.post('/login', login);
 router.get('/me', authRequired, me);
+router.patch('/password', authRequired, changePassword);
 
 // === Google OAuth (Drive + Gmail) ===
 router.get('/google/status', authRequired, googleAuth.status);

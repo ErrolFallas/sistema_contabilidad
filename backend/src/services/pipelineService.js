@@ -56,16 +56,26 @@ async function processFile(input) {
     drive_file_id = null,
     gmail_message_id = null,
     gmail_attachment_id = null,
+    reprocessExistingDocId = null,
   } = input;
 
-  // 1. Hash del archivo
-  const fileHash = await fileSha256(filePath);
+  // Modo reprocesamiento: la fila documents ya existe (mismo id, mismo hash).
+  // Salta el calculo de SHA, la dedup por archivo y el INSERT inicial.
+  // El caller (controller) ya limpio raw_ocr / ai_extractions / processing_trace /
+  // excel_mapping / invoices / invoice_lines, y reseteo el documents row a PROCESSING.
+  let documentId;
+  if (reprocessExistingDocId) {
+    documentId = reprocessExistingDocId;
+    await traceInstant(documentId, 'FILE_RECEIVED', 'OK', 'Reprocesamiento manual');
+  } else {
+    // 1. Hash del archivo
+    const fileHash = await fileSha256(filePath);
 
-  // 2. Dedup
-  const [dups] = await pool.query(
-    `SELECT id, status FROM documents WHERE document_hash = ? LIMIT 1`,
-    [fileHash]
-  );
+    // 2. Dedup
+    const [dups] = await pool.query(
+      `SELECT id, status FROM documents WHERE document_hash = ? LIMIT 1`,
+      [fileHash]
+    );
   if (dups.length > 0) {
     const existing = dups[0];
     // Registramos el intento como duplicado.
@@ -125,8 +135,9 @@ async function processFile(input) {
       uploaded_by_user_id,
     ]
   );
-  const documentId = insDoc.insertId;
-  await traceInstant(documentId, 'FILE_RECEIVED', 'OK');
+    documentId = insDoc.insertId;
+    await traceInstant(documentId, 'FILE_RECEIVED', 'OK');
+  }
 
   try {
     // 4. OCR

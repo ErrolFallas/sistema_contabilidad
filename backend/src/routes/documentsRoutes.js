@@ -26,6 +26,9 @@ router.post('/ingest', ingestTokenRequired, async (req, res, next) => {
 // === Carga manual desde el frontend ===
 router.post('/upload', authRequired, multerUpload.single('file'), documentsController.upload);
 
+// === Reprocesar documento existente (ADMIN) ===
+router.post('/:id/reprocess', authRequired, requireRole('ADMIN'), documentsController.reprocess);
+
 // === Lectura ===
 router.get('/', authRequired, documentsController.list);
 router.get('/reintegro/download', authRequired, documentsController.downloadReintegro);

@@ -163,6 +163,29 @@ export default function DocumentDetailPage() {
     onError: (err) => setInvoiceError(err?.response?.data?.message || err.message),
   });
 
+  const reprocessMutation = useMutation({
+    mutationFn: () => api.post(`/api/documents/${id}/reprocess`).then((r) => r.data),
+    onSuccess: (out) => {
+      qc.invalidateQueries({ queryKey: ['document', id] });
+      qc.invalidateQueries({ queryKey: ['document', id, 'trace'] });
+      qc.invalidateQueries({ queryKey: ['document', id, 'edits'] });
+      alert(`Reprocesado. Status final: ${out.status}. Lineas extraidas: ${out.lines_count}.`);
+    },
+    onError: (err) => alert(err?.response?.data?.message || err.message),
+  });
+
+  function handleReprocess() {
+    if (!confirm(
+      'Reprocesar este documento?\n\n' +
+      'Borra OCR, extraccion IA, factura, lineas, mapeo Excel y trazabilidad anterior.\n' +
+      'El archivo fisico y el documento (id, hash) se preservan.\n' +
+      'El pipeline se vuelve a correr (OCR -> Gemini -> Validacion -> Excel).\n' +
+      'Si Gemini esta caido o saturado, podes recibir el mismo error.\n\n' +
+      'Continuar?'
+    )) return;
+    reprocessMutation.mutate();
+  }
+
   const lineMutation = useMutation({
     mutationFn: async ({ lineId, changes, reason }) => {
       const r = await api.patch(`/api/invoice-lines/${lineId}`, { changes, reason });
@@ -254,7 +277,17 @@ export default function DocumentDetailPage() {
       <div className="flex items-center gap-3">
         <Link to="/documents" className="text-sm text-brand-700 hover:underline">&larr; Volver</Link>
         <h1 className="text-xl font-semibold text-slate-800">Documento #{d.id}</h1>
-        <span className="text-sm text-slate-500">{d.original_filename}</span>
+        <span className="text-sm text-slate-500 flex-1">{d.original_filename}</span>
+        {isAdmin && (
+          <button
+            onClick={handleReprocess}
+            disabled={reprocessMutation.isPending}
+            className="text-xs px-3 py-1.5 rounded border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            title="Vuelve a correr OCR + Gemini + validacion + Excel sobre el mismo archivo"
+          >
+            {reprocessMutation.isPending ? 'Reprocesando...' : 'Reprocesar'}
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

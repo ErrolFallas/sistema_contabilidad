@@ -49,8 +49,14 @@ export default function AppLayout() {
           )}
         </nav>
         <div className="p-3 border-t border-slate-700 text-sm">
-          <div className="text-slate-300">{user?.full_name || user?.email}</div>
-          <div className="text-xs text-slate-500">{user?.role}</div>
+          <NavLink
+            to="/profile"
+            className={({isActive}) => `block hover:bg-slate-800 rounded p-2 -m-2 transition ${isActive ? 'bg-slate-800' : ''}`}
+            title="Mi cuenta (cambiar password)"
+          >
+            <div className="text-slate-300">{user?.full_name || user?.email}</div>
+            <div className="text-xs text-slate-500">{user?.role} - Mi cuenta</div>
+          </NavLink>
           <button
             onClick={logout}
             className="mt-2 w-full text-left text-xs text-red-300 hover:text-red-200"
