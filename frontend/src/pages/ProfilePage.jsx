@@ -50,8 +50,8 @@ export default function ProfilePage() {
     <div className="p-4 md:p-6">
       <h1 className="text-xl font-semibold text-slate-800 mb-1">Mi cuenta</h1>
       <p className="text-sm text-slate-600 mb-4 max-w-3xl">
-        Tu informacion personal y la unica accion que podes hacer por tu cuenta: cambiar tu password. El
-        cambio de email, nombre o rol queda en manos del administrador del sistema.
+        Tus datos personales y la opcion de cambiar tu contrasena. Si necesitas modificar tu correo, tu
+        nombre o tu nivel de acceso, pediselo a un administrador.
       </p>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

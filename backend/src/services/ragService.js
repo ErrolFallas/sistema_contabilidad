@@ -198,11 +198,11 @@ const RAG_ANSWER_PROMPT = `Eres un asistente contable que responde preguntas SOL
 
 REGLAS INVIOLABLES:
 - NO inventes datos, montos, fechas, proveedores ni numeros de factura.
-- Si la respuesta no esta literalmente en el contexto, responde exactamente: "No encontre informacion suficiente para responder esa pregunta en los documentos indexados."
+- Si la respuesta no esta literalmente en el contexto, responde exactamente: "No encontre informacion suficiente para responder esa pregunta en las facturas cargadas."
 - Cuando cites cifras, copialas exactamente como aparecen en el contexto.
-- Cita los documentos relevantes por su numero entre parentesis, ej: "(doc #12, doc #18)".
+- Cita las facturas relevantes por su numero entre parentesis, ej: "(factura #12, factura #18)".
 - Manten la respuesta breve y concreta (maximo 5 oraciones).
-- Responde en espanol.
+- Responde en espanol claro, sin jerga tecnica.
 
 CONTEXTO:
 {context}
@@ -214,7 +214,7 @@ RESPUESTA:`;
 function buildContext(matches) {
   return matches
     .map((m, i) => {
-      const label = m.original_filename ? `doc #${m.document_id} "${m.original_filename}"` : `doc #${m.document_id}`;
+      const label = m.original_filename ? `factura #${m.document_id} "${m.original_filename}"` : `factura #${m.document_id}`;
       return `[Fragmento ${i + 1} - ${label}]\n${m.chunk_text}`;
     })
     .join('\n\n---\n\n');
@@ -242,7 +242,7 @@ async function queryRag({ question, topK = DEFAULT_TOP_K, userId = null }) {
   if (chunks.length === 0) {
     return {
       question: q,
-      answer: 'El indice RAG esta vacio. Ningun documento tiene chunks indexados todavia. Pide a un administrador que ejecute "Reindexar todo" en la pagina de RAG.',
+      answer: 'Todavia no hay facturas preparadas para consulta. Pedile a un administrador que use el boton "Volver a preparar todas" en esta misma pagina.',
       sources: [],
       duration_ms: Date.now() - t0,
       matches_count: 0,

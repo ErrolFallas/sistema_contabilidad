@@ -234,9 +234,10 @@ export default function DocumentsPage() {
       </div>
 
       <p className="text-sm text-slate-600 mb-4 max-w-3xl">
-        Subi facturas (PDF, JPG, PNG) o esperaras que lleguen desde Drive/Gmail. Cada archivo pasa por OCR,
-        extraccion con IA, validacion aritmetica y se anota en el Reintegro.xlsx. Usa los filtros para acotar
-        la lista y entra a cada documento para ver el detalle, editar campos o reprocesar.
+        Sube tus facturas en PDF o foto, o deja que el sistema las traiga solo desde tu correo (Gmail) o tu
+        carpeta de Drive. La IA lee cada factura, identifica proveedor, fecha, montos e IVA, y las va anotando
+        en tu hoja de Reintegro de Caja Chica. Usa los filtros para encontrar una factura especifica, o abrila
+        para revisarla, corregir un dato o volver a procesarla si algo salio mal.
       </p>
 
       <div

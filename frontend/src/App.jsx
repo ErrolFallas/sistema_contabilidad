@@ -29,7 +29,7 @@ export default function App() {
         <Route path="documents" element={<DocumentsPage />} />
         <Route path="documents/:id" element={<DocumentDetailPage />} />
         <Route path="rag" element={<RagPage />} />
-        <Route path="chatbot" element={<Placeholder title="Chatbot contable" description="Asistente conversacional que entiende preguntas en espanol y las traduce a consultas SQL parametrizadas con whitelist de intenciones (gastos del periodo, IVA por tarifa, top proveedores, facturas vencidas, etc). Pendiente de implementacion - modulo P1 grande." />} />
+        <Route path="chatbot" element={<Placeholder title="Asistente contable" description="Un chat para preguntarle al sistema cosas como 'cuanto gaste este mes', 'IVA acumulado por tarifa' o 'facturas vencidas'. La diferencia con la Consulta inteligente es que aca la IA usa los datos contables ya estructurados en lugar del texto de las facturas. Modulo aun no implementado." />} />
         <Route path="traceability" element={<TraceabilityPage />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route

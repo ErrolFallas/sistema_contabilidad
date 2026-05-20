@@ -111,8 +111,9 @@ export default function DashboardPage() {
         </span>
       </div>
       <p className="text-sm text-slate-600 mb-4 max-w-3xl">
-        Resumen general del sistema: documentos procesados, distribucion por estado y origen, top de proveedores,
-        evolucion mensual e IVA acumulado por tarifa. Los datos se actualizan automaticamente cada 15 segundos.
+        Tu vista rapida del estado contable: cuantas facturas se procesaron, quienes son tus principales proveedores,
+        cuanto IVA acumulaste por tarifa y como evoluciono el gasto mes a mes. Los numeros se actualizan solos cada
+        pocos segundos sin que tengas que recargar.
       </p>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">

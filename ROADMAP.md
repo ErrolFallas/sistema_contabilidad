@@ -55,7 +55,8 @@ Lista viva de lo que falta y de mejoras conocidas. Marcar con `[x]` al completar
   - Persistir queries en `rag_queries`.
   - Implementado: `ragService.js` con chunking parrafo-aware (target 800 chars, max 2000), embeddings via Gemini `gemini-embedding-001` (no `text-embedding-004` - ese no esta expuesto en v1beta del SDK 0.24), batchEmbedContents con fallback a individual. Cosine similarity in-memory. Endpoints: POST /api/rag/query, GET /api/rag/status, GET /api/rag/history, POST /api/rag/reindex/:id (ADMIN), POST /api/rag/reindex-all (ADMIN). Prompt restrictivo: solo responde con info del contexto, dice "No encontre informacion suficiente" si no hay match, cita docs por numero. Pipeline async indexa cada doc nuevo tras MYSQL_DONE. Pagina /rag con buscador grande, ejemplos clickeables, panel de respuesta con fuentes citadas (link a /documents/:id) y panel admin de reindex.
 
-- [ ] **(P1, L)** Chatbot contable (Proyecto 3 / seccion 17)
+- [ ] **(P1, L)** Chatbot contable (Proyecto 3 / seccion 17) **[OCULTO EN UI]**
+  - Estado actual: la ruta `/chatbot` existe con un Placeholder informativo, pero el NavLink en el sidebar esta comentado en `AppLayout.jsx`. Para mostrarlo cuando se implemente el modulo, descomentar el bloque.
   - Whitelist de intenciones: gastos_periodo, ingresos_periodo, pagos_pendientes, facturas_vencidas, proveedor_top, iva_por_tarifa.
   - Gemini extrae intencion + parametros (JSON).
   - Validador: rechaza intenciones fuera de whitelist.
@@ -134,10 +135,11 @@ Lista viva de lo que falta y de mejoras conocidas. Marcar con `[x]` al completar
   - Correlacion request_id por request HTTP.
   - Implementado con `pino` + `pino-pretty`. Middleware `requestLogger` agrega `req.log` con `req_id` (UUID) y emite log por request al cerrar response. Header `X-Request-Id` expuesto al cliente. Path `/api/health` silenciado. Secretos (Authorization, X-N8N-Token, JWT_SECRET, etc.) redactados via `redact.paths`. CLI scripts (migrate/seed/test-gemini) mantienen console por simplicidad.
 
-- [ ] **(P2, M)** Tests automatizados
+- [x] **(P2, M)** Tests automatizados
   - Backend: vitest + supertest para endpoints clave.
   - Frontend: vitest + testing-library para componentes criticos.
   - Pipeline: GitHub Actions con check de lint + tests + build.
+  - Implementado: backend tiene 32 tests pasando en 6 archivos (health, auth, documents, dashboard, traceability, rag). Frontend tiene 4 tests para LoginPage (render, validacion zod, llamada a login, error de servidor). Comandos: `npm test` y `npm run test:watch` en backend y frontend. Vitest 4 + supertest en backend; vitest 4 + @testing-library/react + jsdom + user-event en frontend. Setup centralizado en `tests/setup.js`. Happy path de RAG query y cambio de password se omiten en CI (consumen Gemini quota / pisan password admin). Pipeline GitHub Actions queda pendiente como sub-item futuro (necesita CI runner con MySQL).
 
 - [ ] **(P2, S)** Healthchecks mas detallados
   - Disco disponible para `storage/`.

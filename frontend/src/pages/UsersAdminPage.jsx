@@ -69,8 +69,9 @@ export default function UsersAdminPage() {
         </Link>
       </div>
       <p className="text-sm text-slate-600 mb-4 max-w-3xl">
-        Editar nombre, rol (ADMIN/USUARIO) o estado (activo/inactivo) de cada cuenta. El sistema permite
-        un maximo de 3 administradores simultaneos y un admin no puede degradarse ni desactivarse a si mismo.
+        Administra las cuentas del equipo: agrega o desactiva usuarios y cambia quien tiene permisos de
+        administrador. Por seguridad, solo puede haber hasta 3 administradores activos al mismo tiempo, y
+        ningun administrador puede sacarse a si mismo del rol ni desactivarse.
       </p>
 
       <div className={`rounded-lg p-3 mb-4 text-sm ${adminFull ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-slate-50 text-slate-700 border border-slate-200'}`}>

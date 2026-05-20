@@ -86,10 +86,10 @@ export default function GoogleAdminPage() {
     <div className="p-4 md:p-6 max-w-3xl">
       <h1 className="text-xl font-semibold text-slate-800 mb-1">Conexion con Google (Drive + Gmail)</h1>
       <p className="text-sm text-slate-600 mb-4">
-        Autoriza al sistema a leer la carpeta de facturas en Drive y los correos con adjuntos en Gmail.
-        Tambien controla la consulta diaria de tipo de cambio del BCCR y la limpieza periodica del
-        almacenamiento. Los workflows de n8n disparan los polls automaticamente cada 40 segundos;
-        los botones aqui sirven para ejecutar manualmente cuando hace falta.
+        Conecta tu cuenta de Google para que el sistema traiga solo las facturas que recibis por correo
+        o que estan guardadas en tu carpeta de Drive. Tambien aca actualizas el tipo de cambio del dolar
+        (lo trae solo cada dia) y ordenas el almacenamiento de archivos viejos. Los botones permiten
+        ejecutar cualquier accion manualmente cuando no queres esperar a la siguiente revision automatica.
       </p>
 
       <div className="bg-white rounded-lg shadow p-5 mb-4">

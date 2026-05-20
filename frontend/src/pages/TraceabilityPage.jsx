@@ -125,9 +125,9 @@ export default function TraceabilityPage() {
         </span>
       </div>
       <p className="text-sm text-slate-600 mb-4 max-w-3xl">
-        Estado en vivo del pipeline para cada documento: en que etapa quedo, cuanto tardo y donde se atasco.
-        Util para diagnosticar fallos transitorios (timeouts de Gemini, errores de red) o ver cuellos de
-        botella. Filtra por estado, origen o etapa actual; abre el detalle para ver la timeline completa.
+        Sigue paso a paso que paso con cada factura desde que entro al sistema: si se leyo bien, si la IA
+        logro extraer todos los datos, si quedo pendiente de revision o si tuvo algun error. Si una factura
+        no aparece en tu Reintegro y queres saber por que, aca lo ves.
       </p>
 
       <div className="bg-white shadow rounded-lg p-4 mb-4">

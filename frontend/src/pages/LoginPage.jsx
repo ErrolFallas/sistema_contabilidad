@@ -38,10 +38,11 @@ export default function LoginPage() {
         <h1 className="text-xl font-semibold text-slate-800 mb-1">DocScan Finance CR</h1>
         <p className="text-sm text-slate-500 mb-6">Iniciar sesion</p>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
           <div>
-            <label className="text-sm text-slate-700">Correo</label>
+            <label htmlFor="login-email" className="text-sm text-slate-700">Correo</label>
             <input
+              id="login-email"
               {...register('email')}
               type="email"
               autoComplete="username"
@@ -50,8 +51,9 @@ export default function LoginPage() {
             {errors.email && <p className="text-xs text-red-600 mt-1">{errors.email.message}</p>}
           </div>
           <div>
-            <label className="text-sm text-slate-700">Contrasena</label>
+            <label htmlFor="login-password" className="text-sm text-slate-700">Contrasena</label>
             <input
+              id="login-password"
               {...register('password')}
               type="password"
               autoComplete="current-password"

@@ -47,8 +47,8 @@ export default function RagPage() {
     mutationFn: () => api.post('/api/rag/reindex-all', null, { timeout: 600000 }).then((r) => r.data),
     onSuccess: (data) => {
       alert(
-        `Reindexación completa.\n\n` +
-        `Documentos: ${data.indexed} indexados, ${data.skipped} sin texto OCR, ${data.errors} errores.`
+        `Preparación completa.\n\n` +
+        `Facturas: ${data.indexed} listas para consulta, ${data.skipped} sin texto legible, ${data.errors} con error.`
       );
       qc.invalidateQueries({ queryKey: ['rag', 'status'] });
     },
@@ -67,12 +67,12 @@ export default function RagPage() {
 
   return (
     <div className="p-4 md:p-6">
-      <h1 className="text-xl font-semibold text-slate-800 mb-1">Consulta RAG</h1>
+      <h1 className="text-xl font-semibold text-slate-800 mb-1">Consulta inteligente</h1>
       <p className="text-sm text-slate-600 mb-4 max-w-3xl">
-        Pregunta en lenguaje natural sobre el contenido de las facturas procesadas. El sistema busca
-        fragmentos relevantes con búsqueda semántica (embeddings) y pide a Gemini que componga la respuesta
-        citando los documentos consultados. <strong>Nunca inventa datos</strong>: si la información no está
-        en los documentos indexados, lo dice explícitamente.
+        Hacele preguntas a la IA sobre tus facturas en español, como si fuera un asistente. Por ejemplo:
+        "¿cuáles fueron mis compras de ferretería en mayo?" o "¿qué facturas tengo del proveedor X?". La IA
+        busca en todas las facturas cargadas y te responde citando los documentos exactos que usó.
+        <strong> Nunca inventa cifras</strong>: si la información no está en tus facturas, te lo dice.
       </p>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
@@ -132,7 +132,7 @@ export default function RagPage() {
                 <div className="text-xs font-semibold text-slate-500 uppercase mb-1">Respuesta</div>
                 <p className="text-slate-800 whitespace-pre-wrap">{lastResult.answer}</p>
                 <div className="text-xs text-slate-400 mt-2">
-                  Pregunta: "{lastResult.question}" · {lastResult.matches_count} fragmento(s) consultado(s) · {lastResult.duration_ms} ms
+                  Pregunta: "{lastResult.question}" · {lastResult.matches_count} fragmento(s) consultado(s) · {Math.round(lastResult.duration_ms / 100) / 10}s
                 </div>
               </div>
 
@@ -188,33 +188,29 @@ export default function RagPage() {
 
         <div className="space-y-4">
           <div className="bg-white shadow rounded p-4">
-            <h2 className="text-sm font-semibold text-slate-700 mb-3">Estado del índice</h2>
+            <h2 className="text-sm font-semibold text-slate-700 mb-3">Estado de búsqueda</h2>
             <dl className="text-sm space-y-2">
               <div className="flex justify-between">
-                <dt className="text-slate-500">Documentos totales</dt>
+                <dt className="text-slate-500">Facturas totales</dt>
                 <dd className="font-mono text-slate-800">{status?.documents_total ?? '...'}</dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-slate-500">Indexados</dt>
+                <dt className="text-slate-500">Listas para consulta</dt>
                 <dd className="font-mono text-slate-800">{status?.documents_indexed ?? '...'}</dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-slate-500">Fragmentos</dt>
+                <dt className="text-slate-500">Fragmentos de texto</dt>
                 <dd className="font-mono text-slate-800">{status?.chunks_total ?? '...'}</dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-slate-500">Consultas hechas</dt>
+                <dt className="text-slate-500">Preguntas hechas</dt>
                 <dd className="font-mono text-slate-800">{status?.queries_total ?? '...'}</dd>
               </div>
             </dl>
-            <div className="mt-3 pt-3 border-t text-xs text-slate-500 space-y-1">
-              <div>Embeddings: <span className="font-mono">{status?.embedding_model}</span></div>
-              <div>Respuesta: <span className="font-mono">{status?.chat_model}</span></div>
-            </div>
             {status && status.documents_total > status.documents_indexed && (
               <div className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
-                {status.documents_total - status.documents_indexed} documento(s) sin indexar todavía.
-                {isAdmin ? ' Pulsa "Reindexar todo".' : ' Pide a un administrador que reindexe.'}
+                Hay {status.documents_total - status.documents_indexed} factura(s) sin preparar todavía para consulta.
+                {isAdmin ? ' Presiona "Volver a preparar todas".' : ' Pedile a un administrador que las prepare.'}
               </div>
             )}
           </div>
@@ -223,15 +219,16 @@ export default function RagPage() {
             <div className="bg-white shadow rounded p-4">
               <h2 className="text-sm font-semibold text-slate-700 mb-2">Administración</h2>
               <p className="text-xs text-slate-500 mb-3">
-                Reindexar regenera los embeddings de todos los documentos. Toma 1-3 segundos por
-                documento. Los uploads nuevos se indexan solos en el pipeline.
+                Esta acción vuelve a preparar todas las facturas cargadas para que la IA pueda buscarlas.
+                Toma 1-3 segundos por factura. Las facturas nuevas se preparan solas en cuanto entran al
+                sistema, así que normalmente no hace falta usar este botón.
               </p>
               <button
-                onClick={() => { if (confirm('Reindexar todos los documentos? Puede tardar varios minutos.')) reindexAllMutation.mutate(); }}
+                onClick={() => { if (confirm('Volver a preparar todas las facturas para consulta? Puede tardar varios minutos.')) reindexAllMutation.mutate(); }}
                 disabled={reindexAllMutation.isPending}
                 className="w-full bg-amber-600 hover:bg-amber-700 text-white px-3 py-1.5 rounded text-sm disabled:opacity-60"
               >
-                {reindexAllMutation.isPending ? 'Reindexando...' : 'Reindexar todo'}
+                {reindexAllMutation.isPending ? 'Preparando...' : 'Volver a preparar todas'}
               </button>
             </div>
           )}
@@ -239,10 +236,10 @@ export default function RagPage() {
           <div className="bg-slate-50 border border-slate-200 rounded p-3 text-xs text-slate-600">
             <div className="font-semibold mb-1">¿Cómo funciona?</div>
             <ol className="list-decimal pl-4 space-y-1">
-              <li>Tu pregunta se convierte en un vector con Gemini.</li>
-              <li>Se comparan vectores contra todos los fragmentos guardados.</li>
-              <li>Los 5 más parecidos se usan como contexto para que Gemini redacte la respuesta.</li>
-              <li>La respuesta se acompaña con los documentos fuente para verificación.</li>
+              <li>La IA entiende lo que estás preguntando.</li>
+              <li>Busca los fragmentos de tus facturas más relacionados con la pregunta.</li>
+              <li>Con esos fragmentos como base, redacta la respuesta.</li>
+              <li>Te muestra qué facturas usó para que puedas verificar.</li>
             </ol>
           </div>
         </div>
