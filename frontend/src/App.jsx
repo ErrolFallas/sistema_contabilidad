@@ -10,6 +10,7 @@ import RegisterUserPage from './pages/RegisterUserPage.jsx';
 import GoogleAdminPage from './pages/GoogleAdminPage.jsx';
 import TraceabilityPage from './pages/TraceabilityPage.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
+import RagPage from './pages/RagPage.jsx';
 import Placeholder from './pages/Placeholder.jsx';
 
 export default function App() {
@@ -27,8 +28,8 @@ export default function App() {
         <Route index element={<DashboardPage />} />
         <Route path="documents" element={<DocumentsPage />} />
         <Route path="documents/:id" element={<DocumentDetailPage />} />
-        <Route path="rag" element={<Placeholder title="Consulta RAG" description="Busqueda semantica sobre OCR y XML." />} />
-        <Route path="chatbot" element={<Placeholder title="Chatbot contable" description="Asistente conversacional NLP -> SQL parametrizado." />} />
+        <Route path="rag" element={<RagPage />} />
+        <Route path="chatbot" element={<Placeholder title="Chatbot contable" description="Asistente conversacional que entiende preguntas en espanol y las traduce a consultas SQL parametrizadas con whitelist de intenciones (gastos del periodo, IVA por tarifa, top proveedores, facturas vencidas, etc). Pendiente de implementacion - modulo P1 grande." />} />
         <Route path="traceability" element={<TraceabilityPage />} />
         <Route path="profile" element={<ProfilePage />} />
         <Route

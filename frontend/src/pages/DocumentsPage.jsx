@@ -202,7 +202,7 @@ export default function DocumentsPage() {
 
   return (
     <div className="p-4 md:p-6">
-      <div className="flex flex-wrap justify-between items-center gap-2 mb-4">
+      <div className="flex flex-wrap justify-between items-center gap-2 mb-1">
         <h1 className="text-xl font-semibold text-slate-800">Gestion documental</h1>
         <div className="flex flex-wrap gap-2">
           {isAdmin && (
@@ -232,6 +232,12 @@ export default function DocumentsPage() {
           </button>
         </div>
       </div>
+
+      <p className="text-sm text-slate-600 mb-4 max-w-3xl">
+        Subi facturas (PDF, JPG, PNG) o esperaras que lleguen desde Drive/Gmail. Cada archivo pasa por OCR,
+        extraccion con IA, validacion aritmetica y se anota en el Reintegro.xlsx. Usa los filtros para acotar
+        la lista y entra a cada documento para ver el detalle, editar campos o reprocesar.
+      </p>
 
       <div
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}

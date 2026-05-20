@@ -45,7 +45,7 @@ Lista viva de lo que falta y de mejoras conocidas. Marcar con `[x]` al completar
 
 ## 2. RAG y chatbot
 
-- [ ] **(P1, L)** Modulo RAG documental (seccion 13.4 modulo 3 del plan)
+- [x] **(P1, L)** Modulo RAG documental (seccion 13.4 modulo 3 del plan)
   - Chunking de `raw_ocr` por documento.
   - Embedding con Gemini (`text-embedding-004` o similar).
   - Tabla `rag_documents.embedding` (JSON o BLOB).
@@ -53,6 +53,7 @@ Lista viva de lo que falta y de mejoras conocidas. Marcar con `[x]` al completar
   - Response incluye archivo, pagina, fila excel, celda.
   - Pagina `/rag` con buscador.
   - Persistir queries en `rag_queries`.
+  - Implementado: `ragService.js` con chunking parrafo-aware (target 800 chars, max 2000), embeddings via Gemini `gemini-embedding-001` (no `text-embedding-004` - ese no esta expuesto en v1beta del SDK 0.24), batchEmbedContents con fallback a individual. Cosine similarity in-memory. Endpoints: POST /api/rag/query, GET /api/rag/status, GET /api/rag/history, POST /api/rag/reindex/:id (ADMIN), POST /api/rag/reindex-all (ADMIN). Prompt restrictivo: solo responde con info del contexto, dice "No encontre informacion suficiente" si no hay match, cita docs por numero. Pipeline async indexa cada doc nuevo tras MYSQL_DONE. Pagina /rag con buscador grande, ejemplos clickeables, panel de respuesta con fuentes citadas (link a /documents/:id) y panel admin de reindex.
 
 - [ ] **(P1, L)** Chatbot contable (Proyecto 3 / seccion 17)
   - Whitelist de intenciones: gastos_periodo, ingresos_periodo, pagos_pendientes, facturas_vencidas, proveedor_top, iva_por_tarifa.

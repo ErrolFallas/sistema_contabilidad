@@ -54,7 +54,12 @@ export default function RegisterUserPage() {
 
   return (
     <div className="p-4 md:p-6 max-w-xl">
-      <h1 className="text-xl font-semibold text-slate-800 mb-4">Registrar usuario</h1>
+      <h1 className="text-xl font-semibold text-slate-800 mb-1">Registrar usuario</h1>
+      <p className="text-sm text-slate-600 mb-4">
+        Crea una cuenta nueva con email, nombre completo, password inicial y rol. El usuario podra
+        ingresar de inmediato y cambiar su password desde "Mi cuenta". El rol ADMIN tiene un limite
+        global de 3 cuentas activas.
+      </p>
 
       <div className="bg-white rounded-lg shadow p-5 mb-4">
         <div className="text-sm text-slate-600">

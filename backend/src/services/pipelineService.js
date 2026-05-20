@@ -16,6 +16,8 @@ const { appendToReintegro } = require('./excelService');
 const { traceInstant, withStage } = require('./traceService');
 const currencyService = require('./currencyService');
 const validationService = require('./validationService');
+const ragService = require('./ragService');
+const { logger } = require('../lib/logger');
 
 const NUMERIC_INVOICE_FIELDS = ['subtotal', 'descuento', 'impuesto_total', 'total'];
 const NUMERIC_LINE_FIELDS = [
@@ -289,6 +291,19 @@ async function processFile(input) {
     });
 
     await pool.query(`UPDATE documents SET status = 'PERSISTED' WHERE id = ?`, [documentId]);
+
+    // Indexar para RAG (fire-and-forget). No bloquea la respuesta. Si falla,
+    // el documento queda completo pero sin chunks en rag_documents; admin
+    // puede reindexar manualmente despues.
+    ragService.indexDocument(documentId)
+      .then((r) => {
+        if (r.indexed) {
+          logger.info({ document_id: documentId, chunks: r.chunks }, 'rag indexed during pipeline');
+        }
+      })
+      .catch((err) => {
+        logger.warn({ document_id: documentId, err: err.message }, 'rag indexing failed during pipeline');
+      });
 
     // 6.5 Conversion monetaria + validaciones cruzadas (seccion 9 + 16 del plan v2.1)
     //    Conversion:

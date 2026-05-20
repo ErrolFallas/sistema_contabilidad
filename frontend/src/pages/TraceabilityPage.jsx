@@ -118,12 +118,17 @@ export default function TraceabilityPage() {
 
   return (
     <div className="p-4 md:p-6">
-      <div className="flex flex-wrap justify-between items-baseline gap-2 mb-4">
+      <div className="flex flex-wrap justify-between items-baseline gap-2 mb-1">
         <h1 className="text-xl font-semibold text-slate-800">Trazabilidad</h1>
         <span className="text-xs text-slate-400">
           {isLoading ? 'Cargando...' : `${data?.total || 0} documento(s) - refresca cada 5s`}
         </span>
       </div>
+      <p className="text-sm text-slate-600 mb-4 max-w-3xl">
+        Estado en vivo del pipeline para cada documento: en que etapa quedo, cuanto tardo y donde se atasco.
+        Util para diagnosticar fallos transitorios (timeouts de Gemini, errores de red) o ver cuellos de
+        botella. Filtra por estado, origen o etapa actual; abre el detalle para ver la timeline completa.
+      </p>
 
       <div className="bg-white shadow rounded-lg p-4 mb-4">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

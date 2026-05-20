@@ -104,12 +104,16 @@ export default function DashboardPage() {
 
   return (
     <div className="p-4 md:p-6">
-      <div className="flex flex-wrap justify-between items-baseline gap-2 mb-4">
-        <h1 className="text-xl font-semibold text-slate-800">Dashboard</h1>
+      <div className="flex flex-wrap justify-between items-baseline gap-2 mb-1">
+        <h1 className="text-xl font-semibold text-slate-800">Panel principal</h1>
         <span className="text-xs text-slate-400">
           {isLoading ? 'Cargando...' : `Actualizado: ${new Date(stats?.generated_at || Date.now()).toLocaleTimeString('es-CR')}`}
         </span>
       </div>
+      <p className="text-sm text-slate-600 mb-4 max-w-3xl">
+        Resumen general del sistema: documentos procesados, distribucion por estado y origen, top de proveedores,
+        evolucion mensual e IVA acumulado por tarifa. Los datos se actualizan automaticamente cada 15 segundos.
+      </p>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
         <Card title="Procesadas" value={fmtNum(totals.procesadas)} hint={`Total: ${fmtNum(totals.all)}`} tone="green" />

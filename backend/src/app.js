@@ -13,6 +13,7 @@ const invoicesRoutes = require('./routes/invoicesRoutes');
 const invoiceLinesRoutes = require('./routes/invoiceLinesRoutes');
 const traceabilityRoutes = require('./routes/traceabilityRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const ragRoutes = require('./routes/ragRoutes');
 const { requestLogger } = require('./middleware/requestLogger');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
 
@@ -46,6 +47,7 @@ function buildApp() {
   app.use('/api/invoice-lines', invoiceLinesRoutes);
   app.use('/api/traceability', traceabilityRoutes);
   app.use('/api/admin', adminRoutes);
+  app.use('/api/rag', ragRoutes);
 
   app.use(notFound);
   app.use(errorHandler);

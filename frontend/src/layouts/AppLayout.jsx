@@ -94,7 +94,7 @@ export default function AppLayout() {
         </div>
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
           <NavLink to="/" end className={({isActive}) => `${linkBase} ${isActive ? linkActive : linkInactive}`}>
-            Dashboard
+            Panel principal
           </NavLink>
           <NavLink to="/documents" className={({isActive}) => `${linkBase} ${isActive ? linkActive : linkInactive}`}>
             Gestion documental

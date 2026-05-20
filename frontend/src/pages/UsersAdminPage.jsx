@@ -59,7 +59,7 @@ export default function UsersAdminPage() {
 
   return (
     <div className="p-4 md:p-6">
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex flex-wrap justify-between items-center gap-2 mb-1">
         <h1 className="text-xl font-semibold text-slate-800">Gestionar usuarios</h1>
         <Link
           to="/admin/users/new"
@@ -68,6 +68,10 @@ export default function UsersAdminPage() {
           + Registrar usuario
         </Link>
       </div>
+      <p className="text-sm text-slate-600 mb-4 max-w-3xl">
+        Editar nombre, rol (ADMIN/USUARIO) o estado (activo/inactivo) de cada cuenta. El sistema permite
+        un maximo de 3 administradores simultaneos y un admin no puede degradarse ni desactivarse a si mismo.
+      </p>
 
       <div className={`rounded-lg p-3 mb-4 text-sm ${adminFull ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-slate-50 text-slate-700 border border-slate-200'}`}>
         Administradores: <strong>{adminCount} / {adminLimit}</strong>
